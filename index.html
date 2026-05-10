@@ -1,241 +1,457 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stock Dashboard</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
-    .app { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
-    header { margin-bottom: 2rem; }
-    header h1 { font-size: 22px; font-weight: 500; }
-    header p { font-size: 13px; color: #888; margin-top: 4px; }
-    .add-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
-    .add-row input { flex: 1; padding: 0 14px; height: 38px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
-    .add-row input:focus { border-color: #999; }
-    .add-row button { padding: 0 18px; height: 38px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 14px; cursor: pointer; }
-    .add-row button:hover { background: #f0f0f0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 2rem; }
-    .stock-card { background: white; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s; }
-    .stock-card:hover { border-color: #bbb; }
-    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-    .card-ticker { font-size: 16px; font-weight: 500; }
-    .card-name { font-size: 12px; color: #888; margin-top: 2px; }
-    .signal-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 6px; }
-    .badge-buy { background: #e8f7ef; color: #1a7a4a; }
-    .badge-sell { background: #fdeaea; color: #b83030; }
-    .badge-hold { background: #fdf6e3; color: #8a6200; }
-    .card-price { font-size: 22px; font-weight: 500; margin-bottom: 2px; }
-    .card-change { font-size: 13px; }
-    .up { color: #2d9e6b; } .down { color: #d94040; }
-    .sparkline-wrap { margin: 10px 0 8px; height: 50px; position: relative; }
-    .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
-    .congress-pill { font-size: 11px; color: #888; display: flex; align-items: center; gap: 4px; }
-    .congress-dot { width: 6px; height: 6px; border-radius: 50%; background: #7F77DD; flex-shrink: 0; }
-    .remove-btn { font-size: 11px; color: #bbb; background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
-    .remove-btn:hover { color: #d94040; }
-    .detail-panel { background: white; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
-    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .detail-title { font-size: 16px; font-weight: 500; }
-    .close-btn { font-size: 13px; color: #888; background: none; border: none; cursor: pointer; }
-    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 1rem; }
-    .metric { background: #f8f8f8; border-radius: 8px; padding: 0.6rem 0.8rem; }
-    .metric-label { font-size: 11px; color: #888; margin-bottom: 2px; }
-    .metric-value { font-size: 15px; font-weight: 500; }
-    .signal-row { display: flex; align-items: center; gap: 10px; padding: 0.75rem 1rem; border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 1rem; }
-    .signal-reason { font-size: 12px; color: #888; line-height: 1.5; }
-    .section-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; }
-    .congress-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
-    .congress-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 8px; }
-    .congress-name { font-weight: 500; }
-    .congress-meta { color: #888; }
-    .congress-type-buy { color: #1a7a4a; } .congress-type-sell { color: #b83030; }
-    .signal-log { display: flex; flex-direction: column; gap: 8px; }
-    .log-item { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; }
-    .log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
-    .log-date { color: #888; white-space: nowrap; min-width: 48px; }
-    .empty-state { text-align: center; padding: 3rem 1rem; color: #888; font-size: 14px; }
-    .demo-banner { font-size: 11px; color: #888; background: #f8f8f8; border-radius: 8px; padding: 6px 12px; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
-    action-btn { display: inline-block; margin-top: 1rem; padding: 0 16px; height: 36px; line-height: 36px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 13px; cursor: pointer; }
-    .action-btn:hover { background: #f0f0f0; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stock Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
+.app { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+header { margin-bottom: 2rem; }
+header h1 { font-size: 22px; font-weight: 500; }
+header p { font-size: 13px; color: #888; margin-top: 4px; }
+.add-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+.add-row input { flex: 1; padding: 0 14px; height: 38px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+.add-row input:focus { border-color: #999; }
+.add-row button { padding: 0 18px; height: 38px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 14px; cursor: pointer; }
+.add-row button:hover { background: #f0f0f0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 2rem; }
+.stock-card { background: white; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s; }
+.stock-card:hover { border-color: #bbb; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.card-ticker { font-size: 16px; font-weight: 500; }
+.card-name { font-size: 12px; color: #888; margin-top: 2px; }
+.signal-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 6px; }
+.badge-buy { background: #e8f7ef; color: #1a7a4a; }
+.badge-sell { background: #fdeaea; color: #b83030; }
+.badge-hold { background: #fdf6e3; color: #8a6200; }
+.card-price { font-size: 22px; font-weight: 500; margin-bottom: 2px; }
+.card-change { font-size: 13px; }
+.up { color: #2d9e6b; } .down { color: #d94040; }
+
+/* --- Sparkline with context --- */
+.sparkline-wrap { margin: 10px 0 4px; position: relative; }
+.sparkline-canvas-row { height: 50px; position: relative; }
+.sparkline-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 3px; }
+.sparkline-range { font-size: 10px; color: #bbb; }
+.sparkline-prices { display: flex; gap: 6px; }
+.sparkline-low { font-size: 10px; color: #bbb; }
+.sparkline-high { font-size: 10px; color: #bbb; }
+
+.card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+.congress-pill { font-size: 11px; color: #888; display: flex; align-items: center; gap: 4px; }
+.congress-dot { width: 6px; height: 6px; border-radius: 50%; background: #7F77DD; flex-shrink: 0; }
+.remove-btn { font-size: 11px; color: #bbb; background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.remove-btn:hover { color: #d94040; }
+.detail-panel { background: white; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+.detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.detail-title { font-size: 16px; font-weight: 500; }
+.close-btn { font-size: 13px; color: #888; background: none; border: none; cursor: pointer; }
+.metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 1rem; }
+.metric { background: #f8f8f8; border-radius: 8px; padding: 0.6rem 0.8rem; }
+.metric-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+.metric-value { font-size: 15px; font-weight: 500; }
+.signal-row { display: flex; align-items: center; gap: 10px; padding: 0.75rem 1rem; border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 1rem; }
+.signal-reason { font-size: 12px; color: #888; line-height: 1.5; }
+.section-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; }
+.congress-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
+.congress-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 8px; }
+.congress-name { font-weight: 500; }
+.congress-meta { color: #888; }
+.congress-type-buy { color: #1a7a4a; } .congress-type-sell { color: #b83030; }
+.signal-log { display: flex; flex-direction: column; gap: 8px; }
+.log-item { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+.log-date { color: #888; white-space: nowrap; min-width: 48px; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: #888; font-size: 14px; }
+.demo-banner { font-size: 11px; color: #888; background: #f8f8f8; border-radius: 8px; padding: 6px 12px; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+.action-btn { display: inline-block; margin-top: 1rem; padding: 0 16px; height: 36px; line-height: 36px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 13px; cursor: pointer; }
+.action-btn:hover { background: #f0f0f0; }
+
+/* --- Signal legend / onboarding --- */
+.legend-bar {
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.legend-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  text-align: left;
+}
+.legend-toggle:hover { background: #fafafa; }
+.legend-toggle-label { display: flex; align-items: center; gap: 7px; font-weight: 500; }
+.legend-toggle-icon { font-size: 14px; color: #aaa; transition: transform 0.2s; }
+.legend-toggle-icon.open { transform: rotate(180deg); }
+.legend-body {
+  display: none;
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid #f0f0f0;
+}
+.legend-body.visible { display: block; }
+.legend-intro { font-size: 12px; color: #888; margin: 0.75rem 0 1rem; line-height: 1.6; }
+.legend-signals { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }
+.legend-signal-card {
+  flex: 1;
+  min-width: 140px;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid transparent;
+}
+.legend-signal-card.buy { background: #e8f7ef; border-color: #c0e8d0; }
+.legend-signal-card.hold { background: #fdf6e3; border-color: #f0e0a0; }
+.legend-signal-card.sell { background: #fdeaea; border-color: #f0c0c0; }
+.legend-signal-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.legend-signal-card.buy .legend-signal-name { color: #1a7a4a; }
+.legend-signal-card.hold .legend-signal-name { color: #8a6200; }
+.legend-signal-card.sell .legend-signal-name { color: #b83030; }
+.legend-signal-desc { font-size: 11px; color: #666; line-height: 1.5; }
+.legend-ma-section { margin-top: 0.5rem; }
+.legend-ma-title { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 6px; }
+.legend-ma-list { display: flex; flex-direction: column; gap: 5px; }
+.legend-ma-item { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: #666; line-height: 1.5; }
+.legend-ma-pill { font-size: 10px; font-weight: 600; background: #f0f0f0; color: #555; border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+.legend-disclaimer { font-size: 11px; color: #aaa; margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #f0f0f0; line-height: 1.5; }
+</style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>Stock dashboard</h1>
-      <p>Track signals, trends, and congressional activity</p>
-    </header>
+<div class="app">
+  <header>
+    <h1>Stock dashboard</h1>
+    <p>Track signals, trends, and congressional activity</p>
+  </header>
 
-    <div class="demo-banner">
-      <i class="ti ti-info-circle" style="font-size:14px;"></i>
-      Demo mode — live prices coming once hosted. Add any ticker to see it on the watchlist.
-    </div>
+  <div class="demo-banner">
+    <i class="ti ti-info-circle" style="font-size:14px;"></i>
+    Demo mode — live prices coming once hosted. Add any ticker to see it on the watchlist.
+  </div>
 
-    <div class="add-row">
-      <input type="text" id="add-input" placeholder="Add a ticker (e.g. NVDA, META, AMZN)" />
-      <button onclick="addTicker()">+ Add</button>
-    </div>
+  <!-- Signal legend / onboarding -->
+  <div class="legend-bar">
+    <button class="legend-toggle" onclick="toggleLegend()" id="legend-toggle-btn" aria-expanded="false">
+      <span class="legend-toggle-label">
+        <i class="ti ti-help-circle" style="font-size:15px;color:#aaa;"></i>
+        How signals work
+      </span>
+      <i class="ti ti-chevron-down legend-toggle-icon" id="legend-chevron"></i>
+    </button>
+    <div class="legend-body" id="legend-body">
+      <p class="legend-intro">
+        Each stock card shows a <strong>BUY</strong>, <strong>HOLD</strong>, or <strong>SELL</strong> signal derived from moving average (MA) analysis.
+        Moving averages smooth out daily noise to reveal the underlying trend direction.
+      </p>
 
-    <div id="detail-panel" style="display:none;"></div>
-    <div id="watchlist-grid" class="grid"></div>
-    <div id="empty-state" class="empty-state" style="display:none;">
-      No tickers yet. Add one above to get started.
+      <div class="legend-signals">
+        <div class="legend-signal-card buy">
+          <div class="legend-signal-name">BUY</div>
+          <div class="legend-signal-desc">Price is above key moving averages, indicating bullish momentum. The trend is pointing up.</div>
+        </div>
+        <div class="legend-signal-card hold">
+          <div class="legend-signal-name">HOLD</div>
+          <div class="legend-signal-desc">Mixed signals across moving averages — no clear directional edge. Wait for confirmation.</div>
+        </div>
+        <div class="legend-signal-card sell">
+          <div class="legend-signal-name">SELL</div>
+          <div class="legend-signal-desc">Price is below key moving averages, indicating bearish pressure. The trend is pointing down.</div>
+        </div>
+      </div>
+
+      <div class="legend-ma-section">
+        <div class="legend-ma-title">Moving averages used</div>
+        <div class="legend-ma-list">
+          <div class="legend-ma-item">
+            <span class="legend-ma-pill">MA20</span>
+            20-day moving average — short-term trend. Reacts quickly to recent price action.
+          </div>
+          <div class="legend-ma-item">
+            <span class="legend-ma-pill">MA50</span>
+            50-day moving average — medium-term trend. A common benchmark for momentum.
+          </div>
+          <div class="legend-ma-item">
+            <span class="legend-ma-pill">MA200</span>
+            200-day moving average — long-term trend. Price above MA200 is broadly considered bullish.
+          </div>
+        </div>
+      </div>
+
+      <div class="legend-disclaimer">
+        ⚠️ Signals are for informational purposes only and are not financial advice. Moving average signals work best as one input among many — always do your own research before making investment decisions.
+      </div>
     </div>
   </div>
 
-  <script>
-    const MOCK_DATA = {
-      AAPL:{name:'Apple Inc.',price:213.49,change:2.14,changePct:1.01,high52:237.23,low52:164.08,volume:58400000,marketCap:3.28e12,signal:{label:'BUY',reason:'Price above MA20, MA50, and MA200 — bullish alignment across all timeframes.'},prevSignal:'HOLD'},
-      MSFT:{name:'Microsoft Corp.',price:427.83,change:-1.22,changePct:-0.28,high52:468.35,low52:344.79,volume:21300000,marketCap:3.18e12,signal:{label:'HOLD',reason:'Price above MA20 but below MA50 — mixed signals.'},prevSignal:'HOLD'},
-      NVDA:{name:'NVIDIA Corp.',price:897.42,change:18.76,changePct:2.13,high52:974.00,low52:435.21,volume:142000000,marketCap:2.21e12,signal:{label:'BUY',reason:'Price above MA20, MA50, and MA200 — strong bullish alignment.'},prevSignal:'BUY'},
-      GOOGL:{name:'Alphabet Inc.',price:178.32,change:-0.88,changePct:-0.49,high52:207.05,low52:130.67,volume:24100000,marketCap:2.19e12,signal:{label:'HOLD',reason:'Price near MA20 — neutral, watching for breakout.'},prevSignal:'SELL'},
-      META:{name:'Meta Platforms',price:524.11,change:7.33,changePct:1.42,high52:589.02,low52:349.28,volume:17800000,marketCap:1.33e12,signal:{label:'BUY',reason:'Price 4.2% above MA20 — short-term momentum positive.'},prevSignal:'HOLD'},
-      AMZN:{name:'Amazon.com Inc.',price:192.45,change:-2.01,changePct:-1.03,high52:225.49,low52:151.61,volume:39500000,marketCap:2.03e12,signal:{label:'SELL',reason:'Price below MA20 and MA50 — bearish short-term trend.'},prevSignal:'HOLD'},
-    };
-    const CONGRESS = {
-      AAPL:[{name:'Sen. J. Smith',committee:'Finance',type:'Buy',range:'$50k–$100k',date:'Apr 18'},{name:'Rep. A. Torres',committee:'Science & Tech',type:'Buy',range:'$15k–$50k',date:'Apr 2'}],
-      MSFT:[{name:'Rep. L. Chen',committee:'Science & Tech',type:'Buy',range:'$100k–$250k',date:'Apr 22'}],
-      NVDA:[{name:'Sen. M. Davis',committee:'Armed Services',type:'Buy',range:'$50k–$100k',date:'Apr 10'},{name:'Rep. K. Wells',committee:'Science & Tech',type:'Sell',range:'$15k–$50k',date:'Mar 28'}],
-      GOOGL:[{name:'Sen. J. Smith',committee:'Finance',type:'Sell',range:'$15k–$50k',date:'Apr 5'}],
-      META:[{name:'Rep. A. Torres',committee:'Energy & Commerce',type:'Buy',range:'$1k–$15k',date:'Apr 19'}],
-      AMZN:[{name:'Sen. M. Davis',committee:'Finance',type:'Sell',range:'$50k–$100k',date:'Apr 14'},{name:'Rep. L. Chen',committee:'Science & Tech',type:'Sell',range:'$15k–$50k',date:'Apr 1'}],
-    };
-    const LOG = {
-      AAPL:[{date:'Apr 12',signal:'BUY',note:'MA20 crossed above MA50'},{date:'Mar 28',signal:'HOLD',note:'Mixed moving averages'},{date:'Mar 10',signal:'BUY',note:'Price broke above MA200'}],
-      MSFT:[{date:'Apr 20',signal:'HOLD',note:'Mixed moving averages'},{date:'Apr 1',signal:'BUY',note:'MA20 above MA50 and MA200'},{date:'Mar 15',signal:'HOLD',note:'Price near MA20'}],
-      NVDA:[{date:'Apr 18',signal:'BUY',note:'Strong bullish alignment'},{date:'Mar 22',signal:'HOLD',note:'Price pulled back to MA20'},{date:'Mar 5',signal:'BUY',note:'MA20 crossed MA50'}],
-      GOOGL:[{date:'Apr 21',signal:'HOLD',note:'Price near MA20'},{date:'Apr 3',signal:'SELL',note:'Price fell below MA50'},{date:'Mar 18',signal:'HOLD',note:'Mixed signals'}],
-      META:[{date:'Apr 19',signal:'BUY',note:'Momentum above MA20'},{date:'Apr 5',signal:'HOLD',note:'Consolidating near MA20'},{date:'Mar 20',signal:'BUY',note:'MA20 above MA50'}],
-      AMZN:[{date:'Apr 22',signal:'SELL',note:'Price below MA20 and MA50'},{date:'Apr 8',signal:'HOLD',note:'Mixed signals'},{date:'Mar 25',signal:'BUY',note:'Price above all MAs'}],
-    };
+  <div class="add-row">
+    <input type="text" id="add-input" placeholder="Add a ticker (e.g. NVDA, META, AMZN)" />
+    <button onclick="addTicker()">+ Add</button>
+  </div>
 
-    let watchlist = JSON.parse(localStorage.getItem('watchlist_v1') || 'null') || ['AAPL','MSFT','NVDA','GOOGL'];
-    let sparkCharts = {};
+  <div id="detail-panel" style="display:none;"></div>
+  <div id="watchlist-grid" class="grid"></div>
+  <div id="empty-state" class="empty-state" style="display:none;">
+    No tickers yet. Add one above to get started.
+  </div>
+</div>
 
-    function saveWatchlist(){ localStorage.setItem('watchlist_v1', JSON.stringify(watchlist)); }
-    function fmtNum(n,d=2){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
-    function fmtCap(n){ if(n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; return '$'+(n/1e6).toFixed(0)+'M'; }
-    function fmtVol(n){ if(n>=1e9) return (n/1e9).toFixed(2)+'B'; if(n>=1e6) return (n/1e6).toFixed(2)+'M'; return n; }
+<script>
+const MOCK_DATA = {
+  AAPL:{name:'Apple Inc.',price:213.49,change:2.14,changePct:1.01,high52:237.23,low52:164.08,volume:58400000,marketCap:3.28e12,signal:{label:'BUY',reason:'Price above MA20, MA50, and MA200 — bullish alignment across all timeframes.'},prevSignal:'HOLD'},
+  MSFT:{name:'Microsoft Corp.',price:427.83,change:-1.22,changePct:-0.28,high52:468.35,low52:344.79,volume:21300000,marketCap:3.18e12,signal:{label:'HOLD',reason:'Price above MA20 but below MA50 — mixed signals.'},prevSignal:'HOLD'},
+  NVDA:{name:'NVIDIA Corp.',price:897.42,change:18.76,changePct:2.13,high52:974.00,low52:435.21,volume:142000000,marketCap:2.21e12,signal:{label:'BUY',reason:'Price above MA20, MA50, and MA200 — strong bullish alignment.'},prevSignal:'BUY'},
+  GOOGL:{name:'Alphabet Inc.',price:178.32,change:-0.88,changePct:-0.49,high52:207.05,low52:130.67,volume:24100000,marketCap:2.19e12,signal:{label:'HOLD',reason:'Price near MA20 — neutral, watching for breakout.'},prevSignal:'SELL'},
+  META:{name:'Meta Platforms',price:524.11,change:7.33,changePct:1.42,high52:589.02,low52:349.28,volume:17800000,marketCap:1.33e12,signal:{label:'BUY',reason:'Price 4.2% above MA20 — short-term momentum positive.'},prevSignal:'HOLD'},
+  AMZN:{name:'Amazon.com Inc.',price:192.45,change:-2.01,changePct:-1.03,high52:225.49,low52:151.61,volume:39500000,marketCap:2.03e12,signal:{label:'SELL',reason:'Price below MA20 and MA50 — bearish short-term trend.'},prevSignal:'HOLD'},
+};
 
-    function genSparkline(price, change){
-      const pts=[]; let p=price-change*6;
-      for(let i=0;i<14;i++){ p+=(Math.random()-0.48)*price*0.008; pts.push(parseFloat(p.toFixed(2))); }
-      pts.push(parseFloat(price.toFixed(2))); return pts;
-    }
+const CONGRESS = {
+  AAPL:[{name:'Sen. J. Smith',committee:'Finance',type:'Buy',range:'$50k–$100k',date:'Apr 18'},{name:'Rep. A. Torres',committee:'Science & Tech',type:'Buy',range:'$15k–$50k',date:'Apr 2'}],
+  MSFT:[{name:'Rep. L. Chen',committee:'Science & Tech',type:'Buy',range:'$100k–$250k',date:'Apr 22'}],
+  NVDA:[{name:'Sen. M. Davis',committee:'Armed Services',type:'Buy',range:'$50k–$100k',date:'Apr 10'},{name:'Rep. K. Wells',committee:'Science & Tech',type:'Sell',range:'$15k–$50k',date:'Mar 28'}],
+  GOOGL:[{name:'Sen. J. Smith',committee:'Finance',type:'Sell',range:'$15k–$50k',date:'Apr 5'}],
+  META:[{name:'Rep. A. Torres',committee:'Energy & Commerce',type:'Buy',range:'$1k–$15k',date:'Apr 19'}],
+  AMZN:[{name:'Sen. M. Davis',committee:'Finance',type:'Sell',range:'$50k–$100k',date:'Apr 14'},{name:'Rep. L. Chen',committee:'Science & Tech',type:'Sell',range:'$15k–$50k',date:'Apr 1'}],
+};
 
-    document.getElementById('add-input').addEventListener('keydown', e=>{ if(e.key==='Enter') addTicker(); });
+const LOG = {
+  AAPL:[{date:'Apr 12',signal:'BUY',note:'MA20 crossed above MA50'},{date:'Mar 28',signal:'HOLD',note:'Mixed moving averages'},{date:'Mar 10',signal:'BUY',note:'Price broke above MA200'}],
+  MSFT:[{date:'Apr 20',signal:'HOLD',note:'Mixed moving averages'},{date:'Apr 1',signal:'BUY',note:'MA20 above MA50 and MA200'},{date:'Mar 15',signal:'HOLD',note:'Price near MA20'}],
+  NVDA:[{date:'Apr 18',signal:'BUY',note:'Strong bullish alignment'},{date:'Mar 22',signal:'HOLD',note:'Price pulled back to MA20'},{date:'Mar 5',signal:'BUY',note:'MA20 crossed MA50'}],
+  GOOGL:[{date:'Apr 21',signal:'HOLD',note:'Price near MA20'},{date:'Apr 3',signal:'SELL',note:'Price fell below MA50'},{date:'Mar 18',signal:'HOLD',note:'Mixed signals'}],
+  META:[{date:'Apr 19',signal:'BUY',note:'Momentum above MA20'},{date:'Apr 5',signal:'HOLD',note:'Consolidating near MA20'},{date:'Mar 20',signal:'BUY',note:'MA20 above MA50'}],
+  AMZN:[{date:'Apr 22',signal:'SELL',note:'Price below MA20 and MA50'},{date:'Apr 8',signal:'HOLD',note:'Mixed signals'},{date:'Mar 25',signal:'BUY',note:'Price above all MAs'}],
+};
 
-    function addTicker(){
-      const val = document.getElementById('add-input').value.trim().toUpperCase();
-      if(!val || watchlist.includes(val)) return;
-      if(!MOCK_DATA[val]){
-        const p = 150+Math.random()*200;
-        MOCK_DATA[val]={name:val,price:p,change:(Math.random()-0.5)*5,changePct:(Math.random()-0.5)*2,high52:p*1.2,low52:p*0.75,volume:Math.floor(Math.random()*50e6),marketCap:Math.random()*1e12,signal:{label:['BUY','HOLD','SELL'][Math.floor(Math.random()*3)],reason:'Signal computed from moving averages.'},prevSignal:'HOLD'};
-        CONGRESS[val]=[]; LOG[val]=[];
+let watchlist = JSON.parse(localStorage.getItem('watchlist_v1') || 'null') || ['AAPL','MSFT','NVDA','GOOGL'];
+let sparkCharts = {};
+
+function saveWatchlist(){ localStorage.setItem('watchlist_v1', JSON.stringify(watchlist)); }
+function fmtNum(n,d=2){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtCap(n){ if(n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; return '$'+(n/1e6).toFixed(0)+'M'; }
+function fmtVol(n){ if(n>=1e9) return (n/1e9).toFixed(2)+'B'; if(n>=1e6) return (n/1e6).toFixed(2)+'M'; return n; }
+
+// Generate 7-day sparkline data (8 points = today + 7 previous days)
+function genSparkline(price, change){
+  const pts=[]; let p=price - change * 6;
+  for(let i=0;i<14;i++){ p+=(Math.random()-0.48)*price*0.008; pts.push(parseFloat(p.toFixed(2))); }
+  pts.push(parseFloat(price.toFixed(2)));
+  return pts;
+}
+
+// Get date labels for the last 7 days + today
+function getSparkLabels(){
+  const labels = [];
+  for(let i=7; i>=0; i--){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    labels.push(d.toLocaleDateString('en-US', {month:'short', day:'numeric'}));
+  }
+  return labels;
+}
+
+function toggleLegend(){
+  const body = document.getElementById('legend-body');
+  const chevron = document.getElementById('legend-chevron');
+  const btn = document.getElementById('legend-toggle-btn');
+  const isOpen = body.classList.contains('visible');
+  body.classList.toggle('visible', !isOpen);
+  chevron.classList.toggle('open', !isOpen);
+  btn.setAttribute('aria-expanded', String(!isOpen));
+}
+
+document.getElementById('add-input').addEventListener('keydown', e=>{ if(e.key==='Enter') addTicker(); });
+
+function addTicker(){
+  const val = document.getElementById('add-input').value.trim().toUpperCase();
+  if(!val || watchlist.includes(val)) return;
+  if(!MOCK_DATA[val]){
+    const p = 150+Math.random()*200;
+    MOCK_DATA[val]={name:val,price:p,change:(Math.random()-0.5)*5,changePct:(Math.random()-0.5)*2,high52:p*1.2,low52:p*0.75,volume:Math.floor(Math.random()*50e6),marketCap:Math.random()*1e12,signal:{label:['BUY','HOLD','SELL'][Math.floor(Math.random()*3)],reason:'Signal computed from moving averages.'},prevSignal:'HOLD'};
+    CONGRESS[val]=[]; LOG[val]=[];
+  }
+  watchlist.push(val); saveWatchlist();
+  document.getElementById('add-input').value='';
+  renderCard(val); checkEmpty();
+}
+
+function removeTicker(ticker, e){
+  e.stopPropagation();
+  watchlist=watchlist.filter(t=>t!==ticker); saveWatchlist();
+  const card=document.getElementById('card-'+ticker); if(card) card.remove();
+  const panel=document.getElementById('detail-panel');
+  if(panel.dataset.ticker===ticker) panel.style.display='none';
+  checkEmpty();
+}
+
+function checkEmpty(){
+  const empty=watchlist.length===0;
+  document.getElementById('empty-state').style.display=empty?'block':'none';
+  document.getElementById('watchlist-grid').style.display=empty?'none':'grid';
+}
+
+function renderCard(ticker){
+  const d=MOCK_DATA[ticker];
+  const grid=document.getElementById('watchlist-grid');
+  let card=document.getElementById('card-'+ticker);
+  if(!card){ card=document.createElement('div'); card.className='stock-card'; card.id='card-'+ticker; card.onclick=()=>showDetail(ticker); grid.appendChild(card); }
+  const up=d.change>=0;
+  const sign=up?'+':'';
+  const badgeClass=d.signal.label==='BUY'?'badge-buy':d.signal.label==='SELL'?'badge-sell':'badge-hold';
+  const changed=d.prevSignal&&d.prevSignal!==d.signal.label;
+  const cong=CONGRESS[ticker]||[];
+  const buys=cong.filter(t=>t.type==='Buy').length;
+  const congText=cong.length===0?'No recent activity':buys>0?`${buys} recent buy${buys>1?'s':''}`:'Recent sells';
+
+  // Compute sparkline data for price range display
+  const pts = genSparkline(d.price, d.change);
+  const sparkMin = Math.min(...pts);
+  const sparkMax = Math.max(...pts);
+
+  // Get date range label: 7 days ago → today
+  const today = new Date();
+  const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
+  const fmt = dt => dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  const rangeLabel = `${fmt(weekAgo)} – ${fmt(today)}`;
+
+  card.innerHTML=`
+    <div class="card-top">
+      <div><div class="card-ticker">${ticker}</div><div class="card-name">${d.name}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
+        ${changed?`<span style="font-size:10px;color:#888;">${d.prevSignal}→${d.signal.label}</span>`:''}
+      </div>
+    </div>
+    <div class="card-price">$${fmtNum(d.price)}</div>
+    <div class="card-change ${up?'up':'down'}">${sign}$${fmtNum(Math.abs(d.change))} (${sign}${fmtNum(d.changePct)}%)</div>
+    <div class="sparkline-wrap">
+      <div class="sparkline-canvas-row">
+        <canvas id="spark-${ticker}" role="img" aria-label="7-day price trend for ${ticker}"></canvas>
+      </div>
+      <div class="sparkline-meta">
+        <span class="sparkline-range">${rangeLabel}</span>
+        <span class="sparkline-prices">
+          <span class="sparkline-low">L $${fmtNum(sparkMin)}</span>
+          <span class="sparkline-high">H $${fmtNum(sparkMax)}</span>
+        </span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="congress-pill"><span class="congress-dot"></span>Congress: ${congText}</span>
+      <button class="remove-btn" onclick="removeTicker('${ticker}',event)">✕</button>
+    </div>`;
+
+  // Store pts on card for chart rendering (avoid regenerating)
+  card._sparkPts = pts;
+  card._sparkUp = up;
+
+  setTimeout(()=>{
+    const canvas=document.getElementById('spark-'+ticker); if(!canvas) return;
+    if(sparkCharts[ticker]) sparkCharts[ticker].destroy();
+    const cardEl = document.getElementById('card-'+ticker);
+    const ptsToUse = cardEl && cardEl._sparkPts ? cardEl._sparkPts : pts;
+    const isUp = cardEl && cardEl._sparkUp !== undefined ? cardEl._sparkUp : up;
+    const labels = getSparkLabels();
+    // Use subset of labels matching pts length
+    const labelSubset = ptsToUse.map((_, i) => i < labels.length ? labels[i] : '');
+
+    sparkCharts[ticker]=new Chart(canvas,{
+      type:'line',
+      data:{
+        labels: labelSubset,
+        datasets:[{
+          data: ptsToUse,
+          borderColor: isUp ? '#2d9e6b' : '#d94040',
+          borderWidth:1.5,
+          pointRadius:0,
+          tension:0.3,
+          fill: false
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            callbacks:{
+              title: (items) => items[0]?.label || '',
+              label: (item) => `$${fmtNum(item.raw)}`
+            },
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            titleFont: {size: 10},
+            bodyFont: {size: 11},
+            padding: 6,
+            displayColors: false
+          }
+        },
+        scales:{
+          x:{display:false},
+          y:{display:false}
+        },
+        animation:{duration:0}
       }
-      watchlist.push(val); saveWatchlist();
-      document.getElementById('add-input').value='';
-      renderCard(val); checkEmpty();
-    }
+    });
+  },50);
+}
 
-    function removeTicker(ticker, e){
-      e.stopPropagation();
-      watchlist=watchlist.filter(t=>t!==ticker); saveWatchlist();
-      const card=document.getElementById('card-'+ticker); if(card) card.remove();
-      const panel=document.getElementById('detail-panel');
-      if(panel.dataset.ticker===ticker) panel.style.display='none';
-      checkEmpty();
-    }
+function showDetail(ticker){
+  const d=MOCK_DATA[ticker];
+  const panel=document.getElementById('detail-panel');
+  panel.dataset.ticker=ticker;
+  const badgeClass=d.signal.label==='BUY'?'badge-buy':d.signal.label==='SELL'?'badge-sell':'badge-hold';
+  const cong=CONGRESS[ticker]||[];
+  const log=LOG[ticker]||[];
+  panel.innerHTML=`
+    <div class="detail-panel">
+      <div class="detail-header">
+        <div class="detail-title">${ticker} — ${d.name}</div>
+        <button class="close-btn" onclick="document.getElementById('detail-panel').style.display='none'">✕ Close</button>
+      </div>
+      <div class="metrics-row">
+        <div class="metric"><div class="metric-label">Price</div><div class="metric-value">$${fmtNum(d.price)}</div></div>
+        <div class="metric"><div class="metric-label">52w high</div><div class="metric-value">$${fmtNum(d.high52)}</div></div>
+        <div class="metric"><div class="metric-label">52w low</div><div class="metric-value">$${fmtNum(d.low52)}</div></div>
+        <div class="metric"><div class="metric-label">Volume</div><div class="metric-value">${fmtVol(d.volume)}</div></div>
+        <div class="metric"><div class="metric-label">Market cap</div><div class="metric-value">${d.marketCap?fmtCap(d.marketCap):'—'}</div></div>
+      </div>
+      <div class="signal-row">
+        <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
+        <span class="signal-reason">${d.signal.reason}</span>
+      </div>
+      <div class="section-label">Congressional trades (last 45 days)</div>
+      <div class="congress-list">
+        ${cong.length===0?'<div style="font-size:12px;color:#888;">No disclosed trades in this window.</div>':cong.map(t=>`
+        <div class="congress-item">
+          <div><span class="congress-name">${t.name}</span><span class="congress-meta"> · ${t.committee}</span></div>
+          <div><span class="congress-type-${t.type.toLowerCase()}">${t.type}</span><span class="congress-meta"> · ${t.range} · ${t.date}</span></div>
+        </div>`).join('')}
+        <div style="font-size:11px;color:#aaa;padding:4px 2px;">Simulated data — live STOCK Act feed coming next iteration.</div>
+      </div>
+      <div class="section-label" style="margin-top:1rem;">Signal history</div>
+      <div class="signal-log">
+        ${log.map(l=>{ const c=l.signal==='BUY'?'#2d9e6b':l.signal==='SELL'?'#d94040':'#aaa'; return`<div class="log-item"><span class="log-dot" style="background:${c};"></span><span class="log-date">${l.date}</span><span class="log-desc">${l.signal} — ${l.note}</span></div>`; }).join('')}
+      </div>
+    </div>`;
+  panel.style.display='block';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 
-    function checkEmpty(){
-      const empty=watchlist.length===0;
-      document.getElementById('empty-state').style.display=empty?'block':'none';
-      document.getElementById('watchlist-grid').style.display=empty?'none':'grid';
-    }
-
-    function renderCard(ticker){
-      const d=MOCK_DATA[ticker];
-      const grid=document.getElementById('watchlist-grid');
-      let card=document.getElementById('card-'+ticker);
-      if(!card){ card=document.createElement('div'); card.className='stock-card'; card.id='card-'+ticker; card.onclick=()=>showDetail(ticker); grid.appendChild(card); }
-      const up=d.change>=0;
-      const sign=up?'+':'';
-      const badgeClass=d.signal.label==='BUY'?'badge-buy':d.signal.label==='SELL'?'badge-sell':'badge-hold';
-      const changed=d.prevSignal&&d.prevSignal!==d.signal.label;
-      const cong=CONGRESS[ticker]||[];
-      const buys=cong.filter(t=>t.type==='Buy').length;
-      const congText=cong.length===0?'No recent activity':buys>0?`${buys} recent buy${buys>1?'s':''}`:'Recent sells';
-      card.innerHTML=`
-        <div class="card-top">
-          <div><div class="card-ticker">${ticker}</div><div class="card-name">${d.name}</div></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-            <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
-            ${changed?`<span style="font-size:10px;color:#888;">${d.prevSignal}→${d.signal.label}</span>`:''}
-          </div>
-        </div>
-        <div class="card-price">$${fmtNum(d.price)}</div>
-        <div class="card-change ${up?'up':'down'}">${sign}$${fmtNum(Math.abs(d.change))} (${sign}${fmtNum(d.changePct)}%)</div>
-        <div class="sparkline-wrap"><canvas id="spark-${ticker}" role="img" aria-label="7-day sparkline for ${ticker}">7-day trend</canvas></div>
-        <div class="card-footer">
-          <span class="congress-pill"><span class="congress-dot"></span>Congress: ${congText}</span>
-          <button class="remove-btn" onclick="removeTicker('${ticker}',event)">✕</button>
-        </div>`;
-      setTimeout(()=>{
-        const canvas=document.getElementById('spark-'+ticker); if(!canvas) return;
-        if(sparkCharts[ticker]) sparkCharts[ticker].destroy();
-        const pts=genSparkline(d.price,d.change);
-        sparkCharts[ticker]=new Chart(canvas,{type:'line',data:{labels:pts.map((_,i)=>i),datasets:[{data:pts,borderColor:up?'#2d9e6b':'#d94040',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}},animation:{duration:0}}});
-      },50);
-    }
-
-    function showDetail(ticker){
-      const d=MOCK_DATA[ticker];
-      const panel=document.getElementById('detail-panel');
-      panel.dataset.ticker=ticker;
-      const badgeClass=d.signal.label==='BUY'?'badge-buy':d.signal.label==='SELL'?'badge-sell':'badge-hold';
-      const cong=CONGRESS[ticker]||[];
-      const log=LOG[ticker]||[];
-      panel.innerHTML=`
-        <div class="detail-panel">
-          <div class="detail-header">
-            <div class="detail-title">${ticker} — ${d.name}</div>
-            <button class="close-btn" onclick="document.getElementById('detail-panel').style.display='none'">✕ Close</button>
-          </div>
-          <div class="metrics-row">
-            <div class="metric"><div class="metric-label">Price</div><div class="metric-value">$${fmtNum(d.price)}</div></div>
-            <div class="metric"><div class="metric-label">52w high</div><div class="metric-value">$${fmtNum(d.high52)}</div></div>
-            <div class="metric"><div class="metric-label">52w low</div><div class="metric-value">$${fmtNum(d.low52)}</div></div>
-            <div class="metric"><div class="metric-label">Volume</div><div class="metric-value">${fmtVol(d.volume)}</div></div>
-            <div class="metric"><div class="metric-label">Market cap</div><div class="metric-value">${d.marketCap?fmtCap(d.marketCap):'—'}</div></div>
-          </div>
-          <div class="signal-row">
-            <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
-            <span class="signal-reason">${d.signal.reason}</span>
-          </div>
-          <div class="section-label">Congressional trades (last 45 days)</div>
-          <div class="congress-list">
-            ${cong.length===0?'<div style="font-size:12px;color:#888;">No disclosed trades in this window.</div>':cong.map(t=>`
-              <div class="congress-item">
-                <div><span class="congress-name">${t.name}</span><span class="congress-meta"> · ${t.committee}</span></div>
-                <div><span class="congress-type-${t.type.toLowerCase()}">${t.type}</span><span class="congress-meta"> · ${t.range} · ${t.date}</span></div>
-              </div>`).join('')}
-            <div style="font-size:11px;color:#aaa;padding:4px 2px;">Simulated data — live STOCK Act feed coming next iteration.</div>
-          </div>
-          <div class="section-label" style="margin-top:1rem;">Signal history</div>
-          <div class="signal-log">
-            ${log.map(l=>{ const c=l.signal==='BUY'?'#2d9e6b':l.signal==='SELL'?'#d94040':'#aaa'; return`<div class="log-item"><span class="log-dot" style="background:${c};"></span><span class="log-date">${l.date}</span><span class="log-desc">${l.signal} — ${l.note}</span></div>`; }).join('')}
-          </div>
-        </div>`;
-      panel.style.display='block';
-      panel.scrollIntoView({behavior:'smooth',block:'nearest'});
-    }
-
-    watchlist.forEach(t=>renderCard(t));
-    checkEmpty();
-  </script>
+watchlist.forEach(t=>renderCard(t));
+checkEmpty();
+</script>
 </body>
 </html>
