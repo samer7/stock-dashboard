@@ -100,3 +100,11 @@ open index.html
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## Known issues / feedback
+
+- [ ] Sparkline charts lack scale and timeline context — no price labels or date range visible
+- [ ] Stock cards need more at-a-glance detail — signal reasoning, % from 52w high/low, MA values
+- [ ] No onboarding or legend — new visitors have no explanation of what BUY/HOLD/SELL means or how signals are calculated
