@@ -95,7 +95,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    Live price data from Finnhub · signals, congress trades, and 52w metrics are still simulated.
+    Live prices and MA-based signals are real · congressional trades and 52w metrics are still simulated.
   </div>
 
   <div class="add-row">
@@ -107,11 +107,11 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
     <button id="legend-toggle" class="legend-toggle">How are signals computed?</button>
   </div>
   <div id="legend-content" class="legend-content">
-    Signals will be derived from moving averages once live data is wired in:
+    Signals are computed from real moving averages of daily closing prices:
     <strong>BUY</strong> when price is above MA20, MA50, and MA200 (bullish alignment).
     <strong>SELL</strong> when price is below MA20 and MA50 (bearish short-term trend).
     <strong>HOLD</strong> for mixed or transitional alignment.
-    Currently all signal labels are hardcoded for UI demonstration only.
+    The reason text on each ticker shows the actual price-vs-MA percentages.
   </div>
 
   <div id="detail-panel" style="display:none;"></div>
@@ -241,7 +241,10 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Deterministic-per-ticker sparkline so it doesn't visually flicker on re-render.
+// Returns the sparkline points for a ticker. Once refreshSignal has fetched
+// real closing prices, those are cached in sparkData and used directly. Until
+// then (or for tickers with no live data), fall back to a seeded random walk
+// so the card still draws something instead of an empty box.
 function getSparkline(ticker) {
   if (sparkData[ticker]) return sparkData[ticker];
   const d = STOCKS[ticker];
@@ -267,15 +270,36 @@ async function fetchQuote(ticker) {
   }
 }
 
-// Fetches a real quote and updates the card in place. Fields the backend
-// doesn't provide (signal, congress, log) stay as mock data for now.
+// Fetches a real quote and updates the card's price in place. Signal and
+// sparkline come from refreshSignal (real history); congress/log stay mock.
 async function refreshLiveQuote(ticker) {
   const data = await fetchQuote(ticker);
   if (!data) return;
   STOCKS[ticker].price = data.price;
   STOCKS[ticker].change = data.change;
   STOCKS[ticker].changePct = data.changePct;
-  delete sparkData[ticker]; // force sparkline to redraw from new price
+  renderCard(ticker);
+  if (document.getElementById('detail-panel').dataset.ticker === ticker) showDetail(ticker);
+}
+
+// Fetches historical data and applies the real MA-based signal and a real
+// sparkline drawn from actual closing prices. Replaces the hardcoded signal
+// label and the seeded random-walk sparkline for this ticker.
+async function refreshSignal(ticker) {
+  let data;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/history/${ticker}`);
+    if (!res.ok) return;
+    data = await res.json();
+  } catch (e) {
+    return;
+  }
+  if (!data || !data.signal) return;
+  STOCKS[ticker].signal = data.signal;
+  STOCKS[ticker].prevSignal = null; // no real signal history yet — don't show a fabricated transition
+  if (Array.isArray(data.sparkline) && data.sparkline.length) {
+    sparkData[ticker] = data.sparkline; // real closes take over from the random walk
+  }
   renderCard(ticker);
   if (document.getElementById('detail-panel').dataset.ticker === ticker) showDetail(ticker);
 }
@@ -311,7 +335,7 @@ function renderCard(ticker) {
     </div>
     <div class="card-price">$${fmtNum(d.price)}</div>
     <div class="card-change ${up ? 'up' : 'down'}">${sign}$${fmtNum(Math.abs(d.change))} (${sign}${fmtNum(d.changePct)}%)</div>
-    <div class="sparkline-wrap"><canvas id="spark-${esc(ticker)}" role="img" aria-label="7-day sparkline for ${esc(ticker)}">7-day trend</canvas></div>
+    <div class="sparkline-wrap"><canvas id="spark-${esc(ticker)}" role="img" aria-label="30-day price sparkline for ${esc(ticker)}">30-day trend</canvas></div>
     <div class="card-footer">
       <span class="congress-pill"><span class="congress-dot"></span>Congress: ${esc(congText)}</span>
       <button class="remove-btn" data-action="remove" data-ticker="${esc(ticker)}" aria-label="Remove ${esc(ticker)}">✕</button>
@@ -393,6 +417,7 @@ function addTicker() {
   input.value = '';
   renderCard(val); checkEmpty();
   refreshLiveQuote(val); // pull real price for the newly added ticker
+  refreshSignal(val);    // pull real MA-based signal + sparkline
 }
 
 function removeTicker(ticker) {
@@ -428,8 +453,13 @@ document.getElementById('detail-panel').addEventListener('click', e => {
 // ---------- Init ----------
 watchlist.forEach(t => { if (STOCKS[t]) renderCard(t); });
 checkEmpty();
-// Fetch real prices for every ticker — cards show mock data until each resolves.
-watchlist.forEach(t => { if (STOCKS[t]) refreshLiveQuote(t); });
+// Fetch real prices and real MA-based signals for every ticker.
+// Cards show mock data until each request resolves.
+watchlist.forEach(t => {
+  if (!STOCKS[t]) return;
+  refreshLiveQuote(t); // live price/change from Finnhub
+  refreshSignal(t);    // MA-based signal + real sparkline from Twelve Data
+});
 </script>
 </body>
 </html>
