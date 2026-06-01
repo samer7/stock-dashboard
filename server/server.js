@@ -241,6 +241,15 @@ app.get('/api/history/:ticker', async (req, res) => {
     const ma200 = sma(closes, 200);
     const signal = computeSignal(price, ma20, ma50, ma200);
 
+    // 52-week high/low from the full ~year of daily data we already have.
+    // Each day reports its own high and low; the 52w high is the highest of
+    // all the daily highs, the 52w low the lowest of all the daily lows.
+    const high52 = Math.max(...data.values.map(v => parseFloat(v.high)));
+    const low52 = Math.min(...data.values.map(v => parseFloat(v.low)));
+
+    // Most recent day's trading volume.
+    const volume = parseFloat(data.values[0].volume);
+
     // Sparkline: last 30 trading days, reversed to chronological (oldest→newest)
     // so the line reads left-to-right as time moving forward.
     const sparkline = data.values
@@ -255,6 +264,9 @@ app.get('/api/history/:ticker', async (req, res) => {
       ma20,
       ma50,
       ma200,
+      high52,
+      low52,
+      volume,
       sparkline,
     };
 

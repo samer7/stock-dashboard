@@ -95,7 +95,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    Live prices and MA-based signals are real · congressional trades and 52w metrics are still simulated.
+    Live prices, MA-based signals, and 52w metrics are real · congressional trades and signal history are still simulated.
   </div>
 
   <div class="add-row">
@@ -225,7 +225,6 @@ const BACKEND_URL = 'https://samer7-stock-api.onrender.com';
 // ---------- Helpers ----------
 function saveWatchlist() { localStorage.setItem('watchlist_v1', JSON.stringify(watchlist)); }
 function fmtNum(n, d = 2) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function fmtCap(n) { if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'; if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'; return '$' + (n / 1e6).toFixed(0) + 'M'; }
 function fmtVol(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'; return n; }
 
 // Tickers can only be letters and a dot (for symbols like BRK.B). Anything else is rejected.
@@ -297,6 +296,10 @@ async function refreshSignal(ticker) {
   if (!data || !data.signal) return;
   STOCKS[ticker].signal = data.signal;
   STOCKS[ticker].prevSignal = null; // no real signal history yet — don't show a fabricated transition
+  // Real 52-week high/low and volume, computed from the same history.
+  if (typeof data.high52 === 'number') STOCKS[ticker].high52 = data.high52;
+  if (typeof data.low52 === 'number') STOCKS[ticker].low52 = data.low52;
+  if (typeof data.volume === 'number') STOCKS[ticker].volume = data.volume;
   if (Array.isArray(data.sparkline) && data.sparkline.length) {
     sparkData[ticker] = data.sparkline; // real closes take over from the random walk
   }
@@ -372,7 +375,6 @@ function showDetail(ticker) {
         <div class="metric"><div class="metric-label">52w high</div><div class="metric-value">$${fmtNum(d.high52)}</div></div>
         <div class="metric"><div class="metric-label">52w low</div><div class="metric-value">$${fmtNum(d.low52)}</div></div>
         <div class="metric"><div class="metric-label">Volume</div><div class="metric-value">${fmtVol(d.volume)}</div></div>
-        <div class="metric"><div class="metric-label">Market cap</div><div class="metric-value">${d.marketCap ? fmtCap(d.marketCap) : '—'}</div></div>
       </div>
       <div class="signal-row">
         <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
