@@ -2,7 +2,7 @@
 
 A personal stock market dashboard for tracking trends, technical signals, and congressional trading activity.
 
-> **Status:** Prototype. UI shell is functional with simulated data. Real data integration is the next major milestone.
+> **Status:** Prototype. UI shell is functional and now shows **live prices** for the watchlist via a deployed backend. Signals and other data layers are still simulated — see "Honest state" below.
 
 ---
 
@@ -24,13 +24,14 @@ Being upfront about what's real and what isn't, because the line matters:
 | --- | --- | --- |
 | UI / interaction | ✅ | |
 | Watchlist persistence | ✅ | |
-| Price, change, volume | | ⚠️ hardcoded |
+| Price, change, change % | ✅ live from Finnhub via backend | |
+| Volume, market cap, 52w high/low | | ⚠️ hardcoded |
 | Moving average signals | | ⚠️ hardcoded strings, no MA math runs in code yet |
 | Sparkline data | | ⚠️ random walk, regenerates each render |
 | Congressional trades | | ⚠️ hardcoded sample data |
 | Signal history log | | ⚠️ hardcoded |
 
-The signal labels and reasoning text in `MOCK_DATA` were written by hand. The actual MA20/MA50/MA200 calculation referenced in the UI does not yet exist in code — implementing it is part of the next phase, not a completed feature.
+Price, change, and change % are now real — the frontend fetches them from the deployed backend (`samer7-stock-api.onrender.com`), which proxies Finnhub. Everything else, including the BUY/HOLD/SELL signal labels and reasoning text, is still hand-written. The actual MA20/MA50/MA200 calculation does not yet exist in code — implementing it is the next phase. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; accuracy work is deferred until after signal logic exists.)
 
 ---
 
@@ -52,17 +53,17 @@ The next phase is the real project. Everything before it is UI scaffolding.
 - Detail view with metrics, signal reasoning, congress trades, signal log
 - Simulated data for all of the above
 
-### 🔲 Phase 2 — Backend + one real data source (in progress)
+### ✅ Phase 2 — Backend + one real data source (done)
 
-This is the critical phase. The goal is to get one ticker showing fully real data end-to-end before adding anything else.
+The critical phase: real price data flowing end-to-end.
 
-- Minimal backend (Node/Express) on Render free tier — see [`/server`](./server)
+- Minimal backend (Node/Express) deployed to Render free tier — see [`/server`](./server)
 - Single endpoint: `GET /api/quote/:ticker` proxying Finnhub, with 60s in-memory cache
 - Secure API key handling — keys live server-side, never in client code
-- CORS configured for the GitHub Pages origin
-- Wire the existing UI to consume the real endpoint for one ticker first, then expand
+- CORS enabled for the frontend origin
+- UI wired to consume the real endpoint — started with AAPL, then expanded to the full watchlist
 
-### 🔲 Phase 3 — Real signal computation
+### 🔲 Phase 3 — Real signal computation (next)
 
 - Fetch historical daily closes (Finnhub `/stock/candle` or equivalent)
 - Compute MA20 / MA50 / MA200 in code instead of hardcoding signals
