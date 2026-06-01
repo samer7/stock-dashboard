@@ -95,7 +95,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    AAPL: live price data from Finnhub · all other data and signals are still simulated.
+    Live price data from Finnhub · signals, congress trades, and 52w metrics are still simulated.
   </div>
 
   <div class="add-row">
@@ -392,6 +392,7 @@ function addTicker() {
   watchlist.push(val); saveWatchlist();
   input.value = '';
   renderCard(val); checkEmpty();
+  refreshLiveQuote(val); // pull real price for the newly added ticker
 }
 
 function removeTicker(ticker) {
@@ -427,7 +428,8 @@ document.getElementById('detail-panel').addEventListener('click', e => {
 // ---------- Init ----------
 watchlist.forEach(t => { if (STOCKS[t]) renderCard(t); });
 checkEmpty();
-refreshLiveQuote('AAPL'); // fetch real price — card shows mock data until this resolves
+// Fetch real prices for every ticker — cards show mock data until each resolves.
+watchlist.forEach(t => { if (STOCKS[t]) refreshLiveQuote(t); });
 </script>
 </body>
 </html>
