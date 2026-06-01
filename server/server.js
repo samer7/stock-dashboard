@@ -27,6 +27,7 @@ require('dotenv').config();           // Loads variables from a local .env file 
 
 const PORT = process.env.PORT || 3000;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY;
 
 // Fail fast if the key is missing. Better to crash on startup with a clear
 // error than to start up "successfully" and then return broken responses.
@@ -54,6 +55,12 @@ app.use(cors());
 
 const cache = {};
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+// Separate cache for historical data + computed signals. Daily closes only
+// change once a day (after market close), so we can cache these for hours.
+// This keeps us comfortably under Twelve Data's free-tier request limits.
+const historyCache = {};
+const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 // ---------- The actual endpoint ----------
 // When the browser sends GET /api/quote/AAPL, Express runs this function.
@@ -139,6 +146,127 @@ app.get('/api/quote/:ticker', async (req, res) => {
     // Render's log viewer) but send a generic message to the browser.
     console.error('Error fetching quote:', err);
     res.status(500).json({ error: 'Failed to fetch quote' });
+  }
+});
+
+// ---------- Signal helpers ----------
+// A "simple moving average" (SMA) is just the average of the last N closing
+// prices. MA20 smooths over ~1 trading month, MA50 ~2.5 months, MA200 ~10
+// months. Comparing today's price to these averages is a classic way to gauge
+// trend: above the averages = uptrend, below = downtrend.
+//
+// `closes` is ordered newest-first (closes[0] is the most recent day), so the
+// "last N days" are simply the first N entries.
+function sma(closes, n) {
+  if (closes.length < n) return null; // not enough history to compute this MA
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += closes[i];
+  return sum / n;
+}
+
+// Turn the price-vs-MA relationships into a BUY / HOLD / SELL label plus a
+// human-readable reason. Rules match the legend in the UI:
+//   BUY  — price above MA20, MA50, AND MA200 (bullish across all timeframes)
+//   SELL — price below MA20 AND MA50 (bearish short-term trend)
+//   HOLD — anything mixed or transitional
+function computeSignal(price, ma20, ma50, ma200) {
+  // If we don't have enough history for the long averages, don't pretend.
+  if (ma20 === null || ma50 === null || ma200 === null) {
+    return { label: 'HOLD', reason: 'Not enough price history yet to compute a full signal.' };
+  }
+
+  // Describe each relationship as a readable phrase, e.g. "2.1% above MA20".
+  const rel = (ma, name) => {
+    const pct = ((price - ma) / ma) * 100;
+    const dir = pct >= 0 ? 'above' : 'below';
+    return `${Math.abs(pct).toFixed(1)}% ${dir} ${name}`;
+  };
+  const reason = `Price ${rel(ma20, 'MA20')}, ${rel(ma50, 'MA50')}, ${rel(ma200, 'MA200')}.`;
+
+  let label;
+  if (price > ma20 && price > ma50 && price > ma200) {
+    label = 'BUY';
+  } else if (price < ma20 && price < ma50) {
+    label = 'SELL';
+  } else {
+    label = 'HOLD';
+  }
+  return { label, reason };
+}
+
+// ---------- History + signal endpoint ----------
+// GET /api/history/:ticker
+// Fetches ~250 daily closes from Twelve Data, computes the moving averages and
+// signal on the server, and returns a small shape the frontend can render
+// directly (it never sees Twelve Data's raw response or our API key).
+
+app.get('/api/history/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+
+  if (!ticker || ticker.length > 6) {
+    return res.status(400).json({ error: 'Invalid ticker' });
+  }
+
+  if (!TWELVE_DATA_API_KEY) {
+    return res.status(500).json({ error: 'TWELVE_DATA_API_KEY is not set on the server' });
+  }
+
+  // Serve from cache if we fetched this ticker's history recently.
+  const cached = historyCache[ticker];
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ ...cached.data, cached: true });
+  }
+
+  // outputsize=250 ~ a year of trading days, enough to compute MA200.
+  const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=1day&outputsize=250&apikey=${TWELVE_DATA_API_KEY}`;
+
+  try {
+    const tdResponse = await fetch(url);
+    const data = await tdResponse.json();
+
+    // Twelve Data signals errors in the body with status: "error" (e.g. bad
+    // ticker, rate limit) rather than always using an HTTP error code.
+    if (data.status === 'error' || !Array.isArray(data.values)) {
+      const msg = data.message || 'No data returned';
+      const code = data.code === 429 ? 429 : 404;
+      return res.status(code).json({ error: msg });
+    }
+
+    // values is newest-first. Pull out closing prices as numbers.
+    const closes = data.values.map(v => parseFloat(v.close));
+    const price = closes[0];
+
+    const ma20 = sma(closes, 20);
+    const ma50 = sma(closes, 50);
+    const ma200 = sma(closes, 200);
+    const signal = computeSignal(price, ma20, ma50, ma200);
+
+    // Sparkline: last 30 trading days, reversed to chronological (oldest→newest)
+    // so the line reads left-to-right as time moving forward.
+    const sparkline = data.values
+      .slice(0, 30)
+      .map(v => parseFloat(v.close))
+      .reverse();
+
+    const result = {
+      ticker,
+      price,
+      signal,
+      ma20,
+      ma50,
+      ma200,
+      sparkline,
+    };
+
+    historyCache[ticker] = {
+      data: result,
+      expiresAt: Date.now() + HISTORY_CACHE_TTL_MS,
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching history:', err);
+    res.status(500).json({ error: 'Failed to fetch history' });
   }
 });
 
