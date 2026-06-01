@@ -10,10 +10,12 @@ All notable changes to this project will be documented here.
 - Live prices for the whole watchlist (Finnhub via `GET /api/quote/:ticker`)
 - Real MA-based signals: `GET /api/history/:ticker` computes MA20/MA50/MA200 from Twelve Data daily closes and derives BUY/HOLD/SELL with reason text
 - Real 30-day sparklines drawn from actual closing prices
+- Real 52-week high/low and volume in the detail panel (computed from the same Twelve Data history)
 
 ### Changed
 - Signals and sparklines are no longer hardcoded/simulated
 - Banner and legend updated to reflect real signal computation
+- Removed the market cap metric rather than show a stale mock value (it needs share-count data we don't fetch yet) — fixes the case where a real price exceeded a hardcoded 52w high
 
 ### Notes
 - Twelve Data added for historical data because Finnhub's free tier blocks candle data

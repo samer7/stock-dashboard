@@ -45,7 +45,7 @@ Browser (index.html, GitHub Pages)
 | Path | What it is |
 | --- | --- |
 | `index.html` | The entire frontend. Edit carefully — it's one file. |
-| `server/server.js` | The backend. One endpoint: `GET /api/quote/:ticker`. |
+| `server/server.js` | The backend. Endpoints: `GET /api/quote/:ticker` (live), `GET /api/history/:ticker` (history + signal), `GET /health`. |
 | `server/package.json` | Node dependencies (express, cors, dotenv). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |
