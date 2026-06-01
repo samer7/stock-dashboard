@@ -95,7 +95,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    Demo mode — all data is simulated. Live prices and signals coming in the next phase.
+    AAPL: live price data from Finnhub · all other data and signals are still simulated.
   </div>
 
   <div class="add-row">
@@ -220,6 +220,8 @@ let watchlist = JSON.parse(localStorage.getItem('watchlist_v1') || 'null') || ['
 const sparkCharts = {};
 const sparkData = {}; // cached so sparklines don't re-randomize on every render
 
+const BACKEND_URL = 'https://samer7-stock-api.onrender.com';
+
 // ---------- Helpers ----------
 function saveWatchlist() { localStorage.setItem('watchlist_v1', JSON.stringify(watchlist)); }
 function fmtNum(n, d = 2) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
@@ -252,6 +254,30 @@ function getSparkline(ticker) {
   pts.push(parseFloat(d.price.toFixed(2)));
   sparkData[ticker] = pts;
   return pts;
+}
+
+// ---------- Live data ----------
+async function fetchQuote(ticker) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/quote/${ticker}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fetches a real quote and updates the card in place. Fields the backend
+// doesn't provide (signal, congress, log) stay as mock data for now.
+async function refreshLiveQuote(ticker) {
+  const data = await fetchQuote(ticker);
+  if (!data) return;
+  STOCKS[ticker].price = data.price;
+  STOCKS[ticker].change = data.change;
+  STOCKS[ticker].changePct = data.changePct;
+  delete sparkData[ticker]; // force sparkline to redraw from new price
+  renderCard(ticker);
+  if (document.getElementById('detail-panel').dataset.ticker === ticker) showDetail(ticker);
 }
 
 // ---------- Rendering ----------
@@ -401,6 +427,7 @@ document.getElementById('detail-panel').addEventListener('click', e => {
 // ---------- Init ----------
 watchlist.forEach(t => { if (STOCKS[t]) renderCard(t); });
 checkEmpty();
+refreshLiveQuote('AAPL'); // fetch real price — card shows mock data until this resolves
 </script>
 </body>
 </html>
