@@ -2,7 +2,7 @@
 
 A personal stock market dashboard for tracking trends, technical signals, and congressional trading activity.
 
-> **Status:** Prototype. UI shell is functional and now shows **live prices** for the watchlist via a deployed backend. Signals and other data layers are still simulated — see "Honest state" below.
+> **Status:** Prototype. UI shows **live prices** and **real MA-based signals** for the watchlist via a deployed backend. Congressional trades, signal history, and some metrics are still simulated — see "Honest state" below.
 
 ---
 
@@ -25,13 +25,13 @@ Being upfront about what's real and what isn't, because the line matters:
 | UI / interaction | ✅ | |
 | Watchlist persistence | ✅ | |
 | Price, change, change % | ✅ live from Finnhub via backend | |
+| Moving average signals (MA20/50/200) | ✅ computed server-side from Twelve Data history | |
+| Sparkline data | ✅ real 30-day closing prices | |
 | Volume, market cap, 52w high/low | | ⚠️ hardcoded |
-| Moving average signals | | ⚠️ hardcoded strings, no MA math runs in code yet |
-| Sparkline data | | ⚠️ random walk, regenerates each render |
 | Congressional trades | | ⚠️ hardcoded sample data |
 | Signal history log | | ⚠️ hardcoded |
 
-Price, change, and change % are now real — the frontend fetches them from the deployed backend (`samer7-stock-api.onrender.com`), which proxies Finnhub. Everything else, including the BUY/HOLD/SELL signal labels and reasoning text, is still hand-written. The actual MA20/MA50/MA200 calculation does not yet exist in code — implementing it is the next phase. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; accuracy work is deferred until after signal logic exists.)
+Price, change, and change % are real (Finnhub via the backend). Signals are real too: the backend pulls ~250 daily closes from Twelve Data, computes MA20/MA50/MA200, and derives BUY/HOLD/SELL with reason text from the actual price-vs-MA relationships. Sparklines draw real 30-day closing prices. Still hand-written: congressional trades, the signal history log, and the 52w/volume/market-cap metrics. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; data-accuracy review is deferred.)
 
 ---
 
@@ -63,16 +63,16 @@ The critical phase: real price data flowing end-to-end.
 - CORS enabled for the frontend origin
 - UI wired to consume the real endpoint — started with AAPL, then expanded to the full watchlist
 
-### 🔲 Phase 3 — Real signal computation (next)
+### ✅ Phase 3 — Real signal computation (done)
 
-- Fetch historical daily closes (Finnhub `/stock/candle` or equivalent)
-- Compute MA20 / MA50 / MA200 in code instead of hardcoding signals
-- Generate the "reason" text from actual MA relationships
-- Render real 7-day sparklines from real data
+- Fetch historical daily closes from Twelve Data (Finnhub free tier blocks candle data)
+- Compute MA20 / MA50 / MA200 server-side in `GET /api/history/:ticker`
+- Generate the "reason" text from actual price-vs-MA relationships
+- Render real 30-day sparklines from real closing prices
 
 ### 🔲 Phase 4 — Additional data layers
 
-- Alpha Vantage for pre-calculated RSI / MACD (mind the 25/day free tier limit — verify current limits)
+- RSI / MACD indicators — Twelve Data already provides these (it serves the Phase 3 history), so likely reuse it rather than adding Alpha Vantage
 - Quiver Quantitative for real congressional disclosures (paid API; alternative is parsing House/Senate PDFs directly)
 - News headlines with sentiment classification
 
@@ -99,8 +99,8 @@ Decision point: this only matters if the tool is meant to be used by other peopl
 | Frontend | HTML / CSS / vanilla JS | same |
 | Charts | Chart.js | same |
 | Hosting | GitHub Pages | same for frontend |
-| Backend | Node + Express (scaffolded) | same, deployed to Render |
-| Data | hardcoded mocks | Finnhub → Alpha Vantage → Quiver |
+| Backend | Node + Express, deployed to Render | same |
+| Data | Finnhub (live quotes) + Twelve Data (history/signals) | + Quiver / news for later phases |
 | Database | localStorage | Supabase (only if Phase 7 happens) |
 
 ---

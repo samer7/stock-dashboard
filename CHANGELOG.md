@@ -4,6 +4,23 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.3.0] - 2026-05-31
+### Added
+- Backend deployed to Render; frontend now consumes it for real data
+- Live prices for the whole watchlist (Finnhub via `GET /api/quote/:ticker`)
+- Real MA-based signals: `GET /api/history/:ticker` computes MA20/MA50/MA200 from Twelve Data daily closes and derives BUY/HOLD/SELL with reason text
+- Real 30-day sparklines drawn from actual closing prices
+
+### Changed
+- Signals and sparklines are no longer hardcoded/simulated
+- Banner and legend updated to reflect real signal computation
+
+### Notes
+- Twelve Data added for historical data because Finnhub's free tier blocks candle data
+- Finnhub free-tier prices run ~2% off the official close; accuracy review deferred
+
+---
+
 ## [0.2.0] - 2025-05-09
 ### Added
 - Watchlist grid with multi-ticker support

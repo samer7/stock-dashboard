@@ -21,17 +21,24 @@ Browser (index.html, GitHub Pages)
        → fetch (with secret key) → Finnhub API
 ```
 
-## Current state (Phase 2 complete, Phase 3 next)
+## Current state (Phase 3 complete, Phase 4 next)
 
-- Backend deployed to Render at `https://samer7-stock-api.onrender.com` (free tier). `npm start` in `/server` also runs it locally on port 3000. Returns real Finnhub data with a working 60-second cache.
-- Frontend fetches live prices for the whole watchlist from the deployed backend (`BACKEND_URL` constant in `index.html`). Price / change / change% are real.
-- Still mock: signal labels (BUY/HOLD/SELL) and reasoning, congressional trades, signal history, and 52w high/low / volume / market cap. No moving-average math runs anywhere yet.
-- Known limitation: Finnhub free-tier prices run ~2% off the official regular-session close. Accuracy work is intentionally deferred until after signal logic exists.
+- Backend deployed to Render at `https://samer7-stock-api.onrender.com` (free tier). `npm start` in `/server` also runs it locally on port 3000.
+- Two data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
+- `/api/history` computes MA20/MA50/MA200 and a BUY/HOLD/SELL signal with reason text server-side, and returns a 30-day sparkline of real closes.
+- Frontend (`index.html`) fetches both endpoints per ticker: live price from quote, real signal + sparkline from history. `BACKEND_URL` constant points at the Render service.
+- Still mock: congressional trades, signal history log, and 52w high/low / volume / market cap.
+- Known limitation: Finnhub free-tier prices run ~2% off the official regular-session close. Accuracy review is intentionally deferred.
 
-## Immediate next steps (in order)
+## Keys
 
-1. (Phase 3) Add a backend endpoint for historical candles, compute MA20/MA50/MA200 from real data, and replace the placeholder signal logic.
-2. (Phase 3) Render real sparklines from real historical closes instead of the seeded random walk.
+- `FINNHUB_API_KEY` and `TWELVE_DATA_API_KEY` both live in `server/.env` (gitignored) locally and as environment variables in the Render dashboard. Never commit them.
+
+## Immediate next steps (Phase 4 — additional data layers)
+
+1. RSI / MACD indicators — Twelve Data already provides these, so likely reuse it rather than adding Alpha Vantage.
+2. Real congressional disclosures (Quiver Quantitative, or parse House/Senate filings).
+3. News headlines with sentiment.
 
 ## Key files
 
