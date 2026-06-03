@@ -70,11 +70,12 @@ The critical phase: real price data flowing end-to-end.
 - Generate the "reason" text from actual price-vs-MA relationships
 - Render real 30-day sparklines from real closing prices
 
-### 🔲 Phase 4 — Additional data layers
+### 🔸 Phase 4 — Additional data layers (in progress)
 
-- RSI / MACD indicators — Twelve Data already provides these (it serves the Phase 3 history), so likely reuse it rather than adding Alpha Vantage
-- Quiver Quantitative for real congressional disclosures (paid API; alternative is parsing House/Senate PDFs directly)
-- News headlines with sentiment classification
+- ✅ RSI (14) / MACD (12/26/9) indicators — computed server-side from the closes already fetched for the moving averages (no extra API calls); shown in the detail panel with color-coded labels
+- 🔲 Quiver Quantitative for real congressional disclosures (paid API; alternative is parsing House/Senate PDFs directly)
+- 🔲 News headlines with sentiment classification
+- 🔲 Sparkline color reflects the 30-day trend rather than today's price change
 
 ### 🔲 Phase 5 — Signal logic refinement
 

@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.4.0] - 2026-06-03
+### Added
+- RSI (14) and MACD (12/26/9) technical indicators, computed server-side in `GET /api/history/:ticker` from the daily closes already fetched for moving averages — no extra API calls
+- "Technical indicators" section in the detail panel showing RSI and MACD with color-coded labels (Overbought/Oversold/Neutral; Bullish/Bearish/Flat)
+
+### Notes
+- RSI uses Wilder's smoothing and MACD uses EMAs, so values match canonical sources; validated against Twelve Data's own `/rsi` and `/macd` endpoints (AAPL: RSI 73.6 vs 73.58, MACD 9.91 vs 9.914)
+- Computed locally rather than via Twelve Data's indicator endpoints to avoid extra rate-limited calls and external dependency — scales better and costs nothing per request
+
+---
+
 ## [0.3.0] - 2026-05-31
 ### Added
 - Backend deployed to Render; frontend now consumes it for real data
