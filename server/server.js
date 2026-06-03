@@ -194,6 +194,107 @@ function computeSignal(price, ma20, ma50, ma200) {
   return { label, reason };
 }
 
+// ---------- RSI (Relative Strength Index) ----------
+// RSI is a 0–100 momentum gauge. Roughly: above 70 is "overbought" (price has
+// climbed fast and may be due for a pullback), below 30 is "oversold". It
+// compares the size of recent up-moves to recent down-moves over `period` days.
+//
+// We use Wilder's smoothing — the original 1978 definition — so our numbers
+// line up with what brokers and sites like TradingView/Yahoo show. A plain
+// average of gains/losses would be close, but subtly different.
+//
+// `closes` is newest-first (like the other helpers); the math reads more
+// naturally oldest-first, so we reverse a copy first.
+function rsi(closes, period = 14) {
+  if (closes.length < period + 1) return null; // need period+1 closes for period changes
+  const chron = [...closes].reverse(); // oldest → newest
+
+  // Step 1: seed with the average gain and average loss over the first
+  // `period` day-to-day changes.
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const change = chron[i] - chron[i - 1];
+    if (change >= 0) avgGain += change;
+    else avgLoss += -change;
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  // Step 2: Wilder-smooth those averages forward through the rest of the data.
+  // Each new day nudges the running average rather than recomputing from scratch.
+  for (let i = period + 1; i < chron.length; i++) {
+    const change = chron[i] - chron[i - 1];
+    const gain = change >= 0 ? change : 0;
+    const loss = change < 0 ? -change : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+
+  // Step 3: turn the final averages into the 0–100 value.
+  if (avgLoss === 0) return 100; // no down-moves at all → pinned at the top
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
+}
+
+// An exponential moving average (EMA) over a chronological (oldest→newest)
+// series. Unlike the SMA above, an EMA weights recent prices more heavily.
+// We seed it with a simple average of the first `period` values, then roll
+// forward. Returns an array the same length as the input, with null in the
+// early slots that don't have enough data behind them yet. MACD needs EMAs,
+// which is why this is separate from sma().
+function emaSeries(values, period) {
+  const k = 2 / (period + 1); // smoothing factor: how much each new day counts
+  const out = new Array(values.length).fill(null);
+  if (values.length < period) return out;
+
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += values[i];
+  let prev = sum / period; // seed = SMA of the first `period` values
+  out[period - 1] = prev;
+
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
+// ---------- MACD (Moving Average Convergence Divergence) ----------
+// MACD reads momentum by subtracting a slow EMA (26-day) from a fast EMA
+// (12-day) — that difference is the "MACD line". A 9-day EMA of that line is
+// the "signal line". When the MACD line crosses above the signal line it's
+// read as bullish momentum; crossing below, bearish. The "histogram" is just
+// the gap between the two lines (positive = MACD above signal).
+//
+// `closes` is newest-first; reverse to chronological for the EMA math.
+function macd(closes, fast = 12, slow = 26, signalPeriod = 9) {
+  if (closes.length < slow + signalPeriod) return null; // not enough history
+  const chron = [...closes].reverse();
+
+  const emaFast = emaSeries(chron, fast);
+  const emaSlow = emaSeries(chron, slow);
+
+  // The MACD line only exists where BOTH EMAs do (from day `slow` onward).
+  const macdLine = chron.map((_, i) =>
+    emaFast[i] !== null && emaSlow[i] !== null ? emaFast[i] - emaSlow[i] : null
+  );
+
+  // Signal line = 9-day EMA of the MACD line's defined portion.
+  const defined = macdLine.filter(v => v !== null);
+  const signalArr = emaSeries(defined, signalPeriod);
+
+  const macdValue = defined[defined.length - 1];
+  const signalValue = signalArr[signalArr.length - 1];
+  if (macdValue === undefined || signalValue === null) return null;
+
+  return {
+    macd: macdValue,
+    signal: signalValue,
+    histogram: macdValue - signalValue,
+  };
+}
+
 // ---------- History + signal endpoint ----------
 // GET /api/history/:ticker
 // Fetches ~250 daily closes from Twelve Data, computes the moving averages and
@@ -241,6 +342,12 @@ app.get('/api/history/:ticker', async (req, res) => {
     const ma200 = sma(closes, 200);
     const signal = computeSignal(price, ma20, ma50, ma200);
 
+    // Two more technical indicators, computed from the same closes we already
+    // have (no extra API calls). rsi() and macd() return null if there isn't
+    // enough history; the frontend should treat null as "not available".
+    const rsi14 = rsi(closes, 14);
+    const macdData = macd(closes);
+
     // 52-week high/low from the full ~year of daily data we already have.
     // Each day reports its own high and low; the 52w high is the highest of
     // all the daily highs, the 52w low the lowest of all the daily lows.
@@ -267,6 +374,13 @@ app.get('/api/history/:ticker', async (req, res) => {
       high52,
       low52,
       volume,
+      // Round to keep the payload tidy: RSI to 1 decimal, MACD values to 2.
+      rsi: rsi14 === null ? null : Number(rsi14.toFixed(1)),
+      macd: macdData === null ? null : {
+        macd: Number(macdData.macd.toFixed(2)),
+        signal: Number(macdData.signal.toFixed(2)),
+        histogram: Number(macdData.histogram.toFixed(2)),
+      },
       sparkline,
     };
 
