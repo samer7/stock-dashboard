@@ -300,6 +300,10 @@ async function refreshSignal(ticker) {
   if (typeof data.high52 === 'number') STOCKS[ticker].high52 = data.high52;
   if (typeof data.low52 === 'number') STOCKS[ticker].low52 = data.low52;
   if (typeof data.volume === 'number') STOCKS[ticker].volume = data.volume;
+  // RSI/MACD from the backend (null when there isn't enough history). Store as-is;
+  // showDetail() renders "—" when they're missing.
+  STOCKS[ticker].rsi = (typeof data.rsi === 'number') ? data.rsi : null;
+  STOCKS[ticker].macd = (data.macd && typeof data.macd.macd === 'number') ? data.macd : null;
   if (Array.isArray(data.sparkline) && data.sparkline.length) {
     sparkData[ticker] = data.sparkline; // real closes take over from the random walk
   }
@@ -356,6 +360,26 @@ function renderCard(ticker) {
   }, 50);
 }
 
+// Turn an RSI number into a short descriptive tag + color. Convention: above
+// 70 is "overbought" (run-up may be overdone — caution red), below 30 is
+// "oversold" (potential bounce — green), in between is neutral grey.
+function rsiTag(v) {
+  if (typeof v !== 'number') return { text: '—', color: '#aaa' };
+  if (v >= 70) return { text: `${fmtNum(v)} · Overbought`, color: '#d94040' };
+  if (v <= 30) return { text: `${fmtNum(v)} · Oversold`, color: '#2d9e6b' };
+  return { text: `${fmtNum(v)} · Neutral`, color: '#888' };
+}
+
+// MACD: the histogram is the gap between the MACD line and its signal line.
+// Positive = MACD above signal = bullish momentum; negative = bearish.
+function macdTag(m) {
+  if (!m || typeof m.macd !== 'number') return { text: '—', color: '#aaa' };
+  const sign = m.macd >= 0 ? '+' : '';
+  const mood = m.histogram > 0 ? 'Bullish' : m.histogram < 0 ? 'Bearish' : 'Flat';
+  const color = m.histogram > 0 ? '#2d9e6b' : m.histogram < 0 ? '#d94040' : '#888';
+  return { text: `${sign}${fmtNum(m.macd)} · ${mood}`, color };
+}
+
 function showDetail(ticker) {
   const d = STOCKS[ticker]; if (!d) return;
   const panel = document.getElementById('detail-panel');
@@ -379,6 +403,11 @@ function showDetail(ticker) {
       <div class="signal-row">
         <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
         <span class="signal-reason">${esc(d.signal.reason)}</span>
+      </div>
+      <div class="section-label">Technical indicators</div>
+      <div class="metrics-row">
+        <div class="metric"><div class="metric-label">RSI (14)</div><div class="metric-value" style="color:${rsiTag(d.rsi).color};">${esc(rsiTag(d.rsi).text)}</div></div>
+        <div class="metric"><div class="metric-label">MACD (12/26/9)</div><div class="metric-value" style="color:${macdTag(d.macd).color};">${esc(macdTag(d.macd).text)}</div></div>
       </div>
       <div class="section-label">Congressional trades (last 45 days)</div>
       <div class="congress-list">
