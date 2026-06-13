@@ -73,9 +73,10 @@ The critical phase: real price data flowing end-to-end.
 ### 🔸 Phase 4 — Additional data layers (in progress)
 
 - ✅ RSI (14) / MACD (12/26/9) indicators — computed server-side from the closes already fetched for the moving averages (no extra API calls); shown in the detail panel with color-coded labels
-- 🔲 Quiver Quantitative for real congressional disclosures (paid API; alternative is parsing House/Senate PDFs directly)
+- ✅ Real congressional disclosures (House) — built from the official U.S. House Clerk feed (free, no API key), parsing each recent PTR PDF server-side and bucketing stock trades by ticker. Paid options (Quiver, FMP, Finnhub) were all rejected as not-free; the community "stock-watcher" datasets are abandoned (last updated 2021).
+- 🔲 Senate disclosures — separate eFD system behind a click-through agreement; deferred
 - 🔲 News headlines with sentiment classification
-- 🔲 Sparkline color reflects the 30-day trend rather than today's price change
+- ✅ Sparkline color reflects the 30-day trend rather than today's price change
 
 ### 🔲 Phase 5 — Signal logic refinement
 

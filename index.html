@@ -95,7 +95,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    Live prices, MA-based signals, and 52w metrics are real · congressional trades and signal history are still simulated.
+    Live prices, MA-based signals, 52w metrics, and House congressional trades are real · signal history is still simulated.
   </div>
 
   <div class="add-row">
@@ -311,6 +311,27 @@ async function refreshSignal(ticker) {
   if (document.getElementById('detail-panel').dataset.ticker === ticker) showDetail(ticker);
 }
 
+// Fetches real congressional (House) trades for a ticker and replaces the mock
+// congress data. The first call after the backend wakes up can be slow — the
+// server builds its disclosure index by reading many PDFs — so we mark the
+// status 'loading' and re-render, letting the detail panel show a loading note.
+async function refreshCongress(ticker) {
+  const isOpen = () => document.getElementById('detail-panel').dataset.ticker === ticker;
+  STOCKS[ticker].congressStatus = 'loading';
+  if (isOpen()) showDetail(ticker);
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/congress/${ticker}`);
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    STOCKS[ticker].congress = Array.isArray(data.trades) ? data.trades : [];
+    STOCKS[ticker].congressStatus = 'loaded';
+  } catch (e) {
+    STOCKS[ticker].congressStatus = 'error';
+  }
+  renderCard(ticker); // refresh the card's congress pill with real counts
+  if (isOpen()) showDetail(ticker);
+}
+
 // ---------- Rendering ----------
 function checkEmpty() {
   const empty = watchlist.length === 0;
@@ -383,12 +404,31 @@ function macdTag(m) {
   return { text: `${sign}${fmtNum(m.macd)} · ${mood}`, color };
 }
 
+// Build the congressional-trades list for the detail panel. Real data comes from
+// refreshCongress() (the House Clerk feed); congressStatus tracks the in-flight
+// fetch so we can show loading/error rather than a misleading empty list. Each
+// trade is { name, district, type, range, date }.
+function renderCongress(d) {
+  const cong = d.congress || [];
+  if (d.congressStatus === 'loading' && cong.length === 0)
+    return '<div style="font-size:12px;color:#888;">Loading disclosures…</div>';
+  if (d.congressStatus === 'error')
+    return '<div style="font-size:12px;color:#888;">Couldn’t load disclosures right now.</div>';
+  if (cong.length === 0)
+    return '<div style="font-size:12px;color:#888;">No disclosed House trades recently.</div>';
+  const rows = cong.map(t => `
+    <div class="congress-item">
+      <div><span class="congress-name">${esc(t.name)}</span><span class="congress-meta"> · ${esc(t.district || t.committee || '')}</span></div>
+      <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)}</span><span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
+    </div>`).join('');
+  return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only.</div>';
+}
+
 function showDetail(ticker) {
   const d = STOCKS[ticker]; if (!d) return;
   const panel = document.getElementById('detail-panel');
   panel.dataset.ticker = ticker;
   const badgeClass = d.signal.label === 'BUY' ? 'badge-buy' : d.signal.label === 'SELL' ? 'badge-sell' : 'badge-hold';
-  const cong = d.congress || [];
   const log = d.log || [];
 
   panel.innerHTML = `
@@ -412,14 +452,9 @@ function showDetail(ticker) {
         <div class="metric"><div class="metric-label">RSI (14)</div><div class="metric-value" style="color:${rsiTag(d.rsi).color};">${esc(rsiTag(d.rsi).text)}</div></div>
         <div class="metric"><div class="metric-label">MACD (12/26/9)</div><div class="metric-value" style="color:${macdTag(d.macd).color};">${esc(macdTag(d.macd).text)}</div></div>
       </div>
-      <div class="section-label">Congressional trades (last 45 days)</div>
+      <div class="section-label">Congressional trades (House · recent)</div>
       <div class="congress-list">
-        ${cong.length === 0 ? '<div style="font-size:12px;color:#888;">No disclosed trades in this window.</div>' : cong.map(t => `
-          <div class="congress-item">
-            <div><span class="congress-name">${esc(t.name)}</span><span class="congress-meta"> · ${esc(t.committee)}</span></div>
-            <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)}</span><span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
-          </div>`).join('')}
-        <div style="font-size:11px;color:#aaa;padding:4px 2px;">Simulated data — live STOCK Act feed coming next iteration.</div>
+        ${renderCongress(d)}
       </div>
       <div class="section-label" style="margin-top:1rem;">Signal history</div>
       <div class="signal-log">
@@ -452,6 +487,7 @@ function addTicker() {
   renderCard(val); checkEmpty();
   refreshLiveQuote(val); // pull real price for the newly added ticker
   refreshSignal(val);    // pull real MA-based signal + sparkline
+  refreshCongress(val);  // pull real House congressional trades
 }
 
 function removeTicker(ticker) {
@@ -493,6 +529,7 @@ watchlist.forEach(t => {
   if (!STOCKS[t]) return;
   refreshLiveQuote(t); // live price/change from Finnhub
   refreshSignal(t);    // MA-based signal + real sparkline from Twelve Data
+  refreshCongress(t);  // real House congressional trades from the House Clerk feed
 });
 </script>
 </body>

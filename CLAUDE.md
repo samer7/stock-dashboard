@@ -21,14 +21,15 @@ Browser (index.html, GitHub Pages)
        → fetch (with secret key) → Finnhub API
 ```
 
-## Current state (Phase 3 complete, Phase 4 next)
+## Current state (Phase 4 in progress)
 
 - Backend deployed to Render at `https://samer7-stock-api.onrender.com` (free tier). `npm start` in `/server` also runs it locally on port 3000.
-- Two data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
-- `/api/history` computes MA20/MA50/MA200 and a BUY/HOLD/SELL signal with reason text server-side, and returns a 30-day sparkline of real closes.
-- Frontend (`index.html`) fetches both endpoints per ticker: live price from quote, real signal + sparkline from history. `BACKEND_URL` constant points at the Render service.
-- Still mock: congressional trades, signal history log, and 52w high/low / volume / market cap.
-- Known limitation: Finnhub free-tier prices run ~2% off the official regular-session close. Accuracy review is intentionally deferred.
+- Three data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache); the **U.S. House Clerk** disclosure feed supplies congressional trades (`GET /api/congress/:ticker`, 12h cache, no API key). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
+- `/api/history` computes MA20/MA50/MA200, a BUY/HOLD/SELL signal with reason text, RSI(14), MACD(12/26/9), 52w high/low, and volume server-side, plus a 30-day sparkline of real closes.
+- `/api/congress` downloads the House Clerk's yearly disclosure ZIP, parses each recent PTR PDF (via `pdf-parse`), and buckets stock trades by ticker. House only; ~90% of PTRs are machine-readable (the rest are scanned and skipped); only trades with a clean `(TICKER) [ST]` tag are kept.
+- Frontend (`index.html`) fetches all three endpoints per ticker. `BACKEND_URL` constant points at the Render service.
+- Still mock: signal history log. (Market cap was removed rather than mocked.)
+- Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
 
 ## Keys
 
@@ -36,8 +37,8 @@ Browser (index.html, GitHub Pages)
 
 ## Immediate next steps (Phase 4 — additional data layers)
 
-1. RSI / MACD indicators — Twelve Data already provides these, so likely reuse it rather than adding Alpha Vantage.
-2. Real congressional disclosures (Quiver Quantitative, or parse House/Senate filings).
+1. ✅ RSI / MACD indicators — computed locally in `server.js` from the closes already fetched for the MAs (no extra API calls).
+2. ✅ Real congressional disclosures (House) — built from the official U.S. House Clerk feed (free, no key), parsing PTR PDFs server-side. Senate (eFD) still deferred — different system, behind a click-through agreement.
 3. News headlines with sentiment.
 
 ## Key files
@@ -45,8 +46,8 @@ Browser (index.html, GitHub Pages)
 | Path | What it is |
 | --- | --- |
 | `index.html` | The entire frontend. Edit carefully — it's one file. |
-| `server/server.js` | The backend. Endpoints: `GET /api/quote/:ticker` (live), `GET /api/history/:ticker` (history + signal), `GET /health`. |
-| `server/package.json` | Node dependencies (express, cors, dotenv). |
+| `server/server.js` | The backend. Endpoints: `GET /api/quote/:ticker` (live), `GET /api/history/:ticker` (history + signal + RSI/MACD), `GET /api/congress/:ticker` (House trades), `GET /health`. |
+| `server/package.json` | Node dependencies (express, cors, dotenv, adm-zip, pdf-parse). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |
 | `README.md` | Human-facing project overview and roadmap. |

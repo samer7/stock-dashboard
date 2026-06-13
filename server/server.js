@@ -18,6 +18,8 @@
 
 const express = require('express');   // The web framework — handles routing and requests
 const cors = require('cors');         // Lets browsers from other domains call this server
+const AdmZip = require('adm-zip');    // Reads the House Clerk's yearly disclosure ZIP in memory
+const pdfParse = require('pdf-parse'); // Extracts text from the individual disclosure PDFs
 require('dotenv').config();           // Loads variables from a local .env file into process.env
 
 // ---------- Configuration ----------
@@ -61,6 +63,22 @@ const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 // This keeps us comfortably under Twelve Data's free-tier request limits.
 const historyCache = {};
 const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+// ---------- Congressional trades cache ----------
+// Unlike the quote/history caches (one entry per ticker), congressional data is
+// built as a SINGLE index covering every ticker at once. The reason: to find
+// which members traded AAPL we have to read every recent disclosure PDF anyway,
+// so we read them all once, bucket the trades by ticker, and serve from that.
+//
+// `congressIndex` maps TICKER -> array of trade objects. `congressBuild` holds
+// the in-progress build promise so that concurrent requests share one build
+// instead of each kicking off their own (these builds download many PDFs).
+let congressIndex = null;
+let congressBuiltAt = 0;
+let congressBuild = null;
+const CONGRESS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours — filings update ~daily
+const CONGRESS_WINDOW_DAYS = 120;  // only parse filings disclosed in the last ~4 months
+const CONGRESS_PDF_CONCURRENCY = 6; // how many PDFs to download/parse at once
 
 // ---------- The actual endpoint ----------
 // When the browser sends GET /api/quote/AAPL, Express runs this function.
@@ -393,6 +411,199 @@ app.get('/api/history/:ticker', async (req, res) => {
   } catch (err) {
     console.error('Error fetching history:', err);
     res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+
+// ---------- Congressional trades ----------
+// Source: the U.S. House Clerk's official financial-disclosure feed. Every year
+// is published as a ZIP at disclosures-clerk.house.gov containing a tab-separated
+// index of all filings, and each "Periodic Transaction Report" (PTR) is a PDF.
+// PTRs are where members report individual stock trades, as required by the
+// STOCK Act. This is free, official, and updated daily — no API key.
+//
+// Two practical limits we accept for this first version:
+//   1. House only. The Senate publishes through a different system (eFD) that
+//      sits behind a click-through agreement, so it's deferred.
+//   2. ~90% of recent PTRs are filed electronically and produce machine-readable
+//      PDFs; the other ~10% are scanned/handwritten and yield no text. We simply
+//      skip those rather than guess. We also only keep STOCK trades that carry a
+//      clean ticker symbol (the "(AAPL) [ST]" form) — bonds, options, and assets
+//      without a ticker are skipped so we never mis-attribute a trade.
+
+// Compact a dollar figure like 15001 into "$15K" / "$1.5M" for display.
+function abbreviateDollars(n) {
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0) + 'M';
+  if (n >= 1_000) return '$' + Math.round(n / 1_000) + 'K';
+  return '$' + n;
+}
+
+// PTR amounts are disclosed as ranges ("$15,001 - $50,000"), not exact figures.
+// Turn the two raw numbers into a tidy "$15K–$50K". An open-ended top ("$50M+")
+// is possible for the largest band.
+function formatRange(loStr, hiStr) {
+  const lo = parseInt(loStr.replace(/,/g, ''), 10);
+  if (!hiStr) return abbreviateDollars(lo) + '+';
+  const hi = parseInt(hiStr.replace(/,/g, ''), 10);
+  return abbreviateDollars(lo) + '–' + abbreviateDollars(hi); // en dash
+}
+
+// "12/12/2025" -> "Dec 12". Keeps the display short like the rest of the UI.
+function formatTxDate(mdy) {
+  const [m, d, y] = mdy.split('/').map(Number);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  if (!m || !d || !y) return mdy;
+  return `${months[m - 1]} ${d}`;
+}
+
+// Pull the stock transactions out of one PTR's extracted text. We only match the
+// "(TICKER) [ST]" rows — a ticker in parentheses immediately followed by the
+// [ST] "stock" asset-type tag — which is the unambiguous, machine-readable case.
+//
+// In the PDF text a row looks like (after whitespace is collapsed):
+//   "... Common Stock (NFLX) [ST] S 12/12/202501/06/2026$1,001 - $15,000"
+// i.e. ticker, then the type letter (P purchase / S sale / E exchange), then the
+// transaction date glued to the notification date, then the amount range.
+function parseStockTransactions(text) {
+  const flat = text.replace(/\s+/g, ' ');
+  const re = /\(([A-Z.]{1,5})\)\s*\[ST\]\s*(P|S|E)(?:\s*\(partial\))?\s*(\d{2}\/\d{2}\/\d{4})\d{2}\/\d{2}\/\d{4}\$([\d,]+)\s*-\s*\$?([\d,]+)?/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(flat)) !== null) {
+    const [, ticker, typeCode, txDate, lo, hi] = m;
+    if (typeCode === 'E') continue; // exchanges aren't a clear buy/sell — skip
+    out.push({
+      ticker,
+      type: typeCode === 'P' ? 'Buy' : 'Sell',
+      range: formatRange(lo, hi),
+      date: formatTxDate(txDate),
+      txDate, // raw mm/dd/yyyy, kept for sorting
+    });
+  }
+  return out;
+}
+
+// Run an async worker over `items` with at most `limit` in flight at once. This
+// keeps us from opening hundreds of simultaneous connections to the House server
+// (rude, and likely to get throttled) while still being much faster than one at
+// a time.
+async function mapWithConcurrency(items, limit, worker) {
+  const results = [];
+  let i = 0;
+  async function run() {
+    while (i < items.length) {
+      const idx = i++;
+      results[idx] = await worker(items[idx], idx);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+  return results;
+}
+
+// Download and parse every recent House PTR, returning a TICKER -> trades map.
+// This is the expensive part (one HTTP request per PDF), so it runs at most once
+// per cache window; callers go through getCongressIndex(), not this directly.
+async function buildCongressIndex() {
+  const year = new Date().getFullYear();
+  const zipUrl = `https://disclosures-clerk.house.gov/public_disc/financial-pdfs/${year}FD.zip`;
+
+  // 1. Grab the yearly ZIP and read the tab-separated index out of it.
+  const zipResp = await fetch(zipUrl);
+  if (!zipResp.ok) throw new Error(`House feed returned ${zipResp.status}`);
+  const zip = new AdmZip(Buffer.from(await zipResp.arrayBuffer()));
+  const txtEntry = zip.getEntries().find(e => e.entryName.endsWith('.txt'));
+  if (!txtEntry) throw new Error('No index .txt inside the House ZIP');
+  const rows = txtEntry.getData().toString('latin1').split('\n');
+
+  // Columns: Prefix, Last, First, Suffix, FilingType, StateDst, Year, FilingDate, DocID
+  const cutoff = Date.now() - CONGRESS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const filings = [];
+  for (let r = 1; r < rows.length; r++) { // r=0 is the header
+    const c = rows[r].split('\t');
+    if (c.length < 9) continue;
+    const filingType = c[4];
+    const docId = c[8].trim();
+    if (filingType !== 'P') continue;          // P = Periodic Transaction Report
+    if (!/^\d+$/.test(docId) || Number(docId) < 20_000_000) continue; // digital filings only
+    const filed = Date.parse(c[7]);            // FilingDate, mm/dd/yyyy
+    if (Number.isFinite(filed) && filed < cutoff) continue; // older than our window
+    filings.push({
+      docId,
+      name: `Rep. ${c[2].trim()} ${c[1].trim()}`.replace(/\s+/g, ' ').trim(),
+      district: c[5].trim(),
+    });
+  }
+
+  // 2. Fetch + parse each filing's PDF, bucketing every stock trade by ticker.
+  const index = {};
+  await mapWithConcurrency(filings, CONGRESS_PDF_CONCURRENCY, async (f) => {
+    const pdfUrl = `https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${year}/${f.docId}.pdf`;
+    try {
+      const resp = await fetch(pdfUrl);
+      if (!resp.ok) return;
+      const text = (await pdfParse(Buffer.from(await resp.arrayBuffer()))).text;
+      for (const tx of parseStockTransactions(text)) {
+        (index[tx.ticker] ||= []).push({
+          name: f.name,
+          district: f.district,
+          type: tx.type,
+          range: tx.range,
+          date: tx.date,
+          txDate: tx.txDate,
+        });
+      }
+    } catch (err) {
+      // A single unreadable/missing PDF shouldn't sink the whole build.
+      console.error(`congress: skipped ${f.docId}:`, err.message);
+    }
+  });
+
+  // 3. Sort each ticker's trades newest-first by the actual transaction date.
+  for (const ticker of Object.keys(index)) {
+    index[ticker].sort((a, b) => Date.parse(b.txDate) - Date.parse(a.txDate));
+  }
+  return index;
+}
+
+// Return the cached index, (re)building it if missing or stale. Concurrent
+// callers during a build all await the same promise.
+async function getCongressIndex() {
+  const fresh = congressIndex && Date.now() - congressBuiltAt < CONGRESS_CACHE_TTL_MS;
+  if (fresh) return congressIndex;
+  if (!congressBuild) {
+    congressBuild = buildCongressIndex()
+      .then((idx) => {
+        congressIndex = idx;
+        congressBuiltAt = Date.now();
+        return idx;
+      })
+      .finally(() => { congressBuild = null; });
+  }
+  return congressBuild;
+}
+
+// GET /api/congress/:ticker
+// Returns recent House trades for one ticker, newest-first. The first call after
+// startup (or after the 12h cache expires) triggers a build that downloads many
+// PDFs and can take a while — the frontend should show a loading state.
+app.get('/api/congress/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+  if (!ticker || ticker.length > 6) {
+    return res.status(400).json({ error: 'Invalid ticker' });
+  }
+
+  try {
+    const index = await getCongressIndex();
+    const trades = (index[ticker] || []).slice(0, 10); // cap what we send the UI
+    res.json({
+      ticker,
+      trades,
+      count: trades.length,
+      builtAt: new Date(congressBuiltAt).toISOString(),
+      source: 'U.S. House Clerk financial disclosures (House only)',
+    });
+  } catch (err) {
+    console.error('Error building congress index:', err);
+    res.status(502).json({ error: 'Failed to load congressional disclosures' });
   }
 });
 
