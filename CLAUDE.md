@@ -35,11 +35,16 @@ Browser (index.html, GitHub Pages)
 
 - `FINNHUB_API_KEY` and `TWELVE_DATA_API_KEY` both live in `server/.env` (gitignored) locally and as environment variables in the Render dashboard. Never commit them.
 
-## Immediate next steps (Phase 4 — additional data layers)
+## Roadmap (see README.md for the full, detailed version)
 
-1. ✅ RSI / MACD indicators — computed locally in `server.js` from the closes already fetched for the MAs (no extra API calls).
-2. ✅ Real congressional disclosures (House) — built from the official U.S. House Clerk feed (free, no key), parsing PTR PDFs server-side. Senate (eFD) still deferred — different system, behind a click-through agreement.
-3. News headlines with sentiment.
+Phases 1–3 done. Current and upcoming:
+
+- **Phase 4 — data layers (in progress).** ✅ RSI/MACD, ✅ House congressional trades, ✅ sparkline trend color. Remaining: widen congress coverage (window 120→365d, cap 10→25), capture clean tickers on any asset type (ETFs), surface untickered disclosures as an aggregate, a "recent House activity" feed, a trade-size band breakdown, Senate disclosures (deferred — gated eFD), and news + sentiment.
+- **Phase 5 — signal rigor & evaluation harness.** Reframed goal: *not* precise prediction (unachievable; even top quant funds win ~51% of trades) but honestly-measured small edges. Build the evaluation harness FIRST (walk-forward/out-of-sample, transaction costs, Brier/log-loss, beat buy-and-hold + random-walk baselines), THEN probabilistic/volatility models, weighted multi-signal scoring, and risk/sizing (Sharpe, Kelly). Guard against lookahead/overfitting/survivorship bias. Note the congressional 45-day delay limits its short-term predictive value.
+- **Phase 6 — paper trading / "simulated run."** Fake-money portfolio following the site's suggestions. Shares ONE simulator core with Phase 5a (backtest = same engine run over history; paper-trade = run forward). 6a manual (localStorage, live-priced, benchmarked vs buy-and-hold); 6b auto-follow = live forward-test.
+- **Phase 7 — UI polish.** **Phase 8 — multi-user** (only if scope expands; a real DB like Supabase enters only here).
+
+When working on Phase 5/6, keep the owner-is-learning ethos: explain the math, prefer clarity, and never report an "accuracy" number that isn't out-of-sample and cost-aware.
 
 ## Key files
 

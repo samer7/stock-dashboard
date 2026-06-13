@@ -74,23 +74,40 @@ The critical phase: real price data flowing end-to-end.
 
 - ✅ RSI (14) / MACD (12/26/9) indicators — computed server-side from the closes already fetched for the moving averages (no extra API calls); shown in the detail panel with color-coded labels
 - ✅ Real congressional disclosures (House) — built from the official U.S. House Clerk feed (free, no API key), parsing each recent PTR PDF server-side and bucketing stock trades by ticker. Paid options (Quiver, FMP, Finnhub) were all rejected as not-free; the community "stock-watcher" datasets are abandoned (last updated 2021).
-- 🔲 Senate disclosures — separate eFD system behind a click-through agreement; deferred
-- 🔲 News headlines with sentiment classification
 - ✅ Sparkline color reflects the 30-day trend rather than today's price change
+- 🔲 Widen congress coverage (quick wins): parse window 120 → 365 days; per-ticker display cap 10 → 25
+- 🔲 Capture clean tickers on **any** asset type, not just `[ST]` — picks up exchange-traded funds/ETFs that filers tag differently
+- 🔲 Surface **untickered** disclosures (bonds, private/managed funds, structured products) as an aggregate count so that activity isn't invisible — most non-stock holdings have no market ticker and can't be matched, but they should still be visible
+- 🔲 "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings, so a feed reads far more substantial than per-ticker slices)
+- 🔲 Trade-size **band breakdown** — distribution across the disclosure bands ($1K–$15K … $50M+), per ticker and/or in the feed
+- 🔲 Senate disclosures — separate eFD system behind a click-through agreement; own mini-project, deferred
+- 🔲 News headlines with sentiment classification
 
-### 🔲 Phase 5 — Signal logic refinement
+### 🔲 Phase 5 — Signal rigor & evaluation harness
 
-- Weighted scoring across moving averages, RSI/MACD, congressional activity, news sentiment
-- Each input casts a weighted vote toward final BUY / HOLD / SELL
-- Backtest signal accuracy against historical data before trusting the output
+The honest core of the project. **Reframed goal:** not "predict prices precisely" (not achievable by anyone — even the best quant funds win ~51% of trades), but **quantify uncertainty well and find small, statistically validated edges, measured without self-deception.** "Minimal error" claims almost always come from lookahead bias, overfitting, survivorship bias, or ignoring costs — so the harness comes *before* any fancy model.
 
-### 🔲 Phase 6 — UI polish (intentionally later)
+- **5a — Evaluation harness first:** a portfolio simulator with walk-forward (out-of-sample) testing, transaction costs + slippage, proper error metrics, and baselines to beat (buy-and-hold and a random walk). No strategy is trusted until it beats those out-of-sample.
+- **5b — Probabilistic signals:** convert BUY/HOLD/SELL into *calibrated probabilities*; add volatility modeling (GARCH/EWMA — volatility is far more predictable than price); grade with proper scoring rules (Brier score, log-loss).
+- **5c — Weighted multi-signal model:** combine MA / RSI / MACD / congressional flow, each weighted by its validated track record (Bayesian or regularized regression; time-series cross-validation only).
+- **5d — Risk & sizing:** Sharpe / Sortino / max-drawdown reporting; Kelly-based position sizing.
+- Caveat to test, not assume: the congressional signal carries a ~45-day disclosure delay, so its predictive horizon is long and likely weak for short-term moves.
+
+### 🔲 Phase 6 — Paper trading / simulated portfolio ("simulated run")
+
+Hypothetically invest fake money by following the site's suggestions and track the results. Built on the **same simulator core as Phase 5a** — a backtest and a paper-trade are the same engine with a different clock (historical vs. forward). The auto-follow mode is a **live, lookahead-proof forward-test** of the strategy, which is the gold standard for proving signals aren't fooling us.
+
+- **6a — Manual paper portfolio:** start with fake cash, buy/sell at live prices on suggestions, transaction log, value charted **against a buy-and-hold benchmark**. localStorage-backed (single-user). Can ship relatively early as a standalone feature.
+- **6b — Auto-follow mode:** the system executes its own signals forward over time = live forward-test, reusing the Phase 5 engine + metrics (return, Sharpe, drawdown).
+- Honest caveat: a single run reflects whatever market regime it ran in and accrues slowly — a great gut-check and demo, but a complement to backtesting, not a replacement.
+
+### 🔲 Phase 7 — UI polish (intentionally later)
 
 Deferred until real data is flowing, because much of this changes once the data is real.
 
-### 🔲 Phase 7 — Multi-user (only if scope expands)
+### 🔲 Phase 8 — Multi-user (only if scope expands)
 
-Decision point: this only matters if the tool is meant to be used by other people. A personal tool can stay client-only with localStorage.
+Decision point: this only matters if the tool is meant to be used by other people. A personal tool can stay client-only with localStorage. A real database (e.g. Supabase) only enters here.
 
 ---
 
