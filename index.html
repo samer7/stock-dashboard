@@ -352,9 +352,12 @@ function renderCard(ticker) {
     const canvas = document.getElementById('spark-' + ticker); if (!canvas) return;
     if (sparkCharts[ticker]) sparkCharts[ticker].destroy();
     const pts = getSparkline(ticker);
+    // Color by the 30-day trend (last close vs. first), not today's change, so
+    // the line matches the shape it's drawing rather than flipping on a down day.
+    const trendUp = pts.length > 1 ? pts[pts.length - 1] >= pts[0] : up;
     sparkCharts[ticker] = new Chart(canvas, {
       type: 'line',
-      data: { labels: pts.map((_, i) => i), datasets: [{ data: pts, borderColor: up ? '#2d9e6b' : '#d94040', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }] },
+      data: { labels: pts.map((_, i) => i), datasets: [{ data: pts, borderColor: trendUp ? '#2d9e6b' : '#d94040', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, animation: { duration: 0 } },
     });
   }, 50);
