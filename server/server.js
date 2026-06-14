@@ -77,7 +77,10 @@ let congressIndex = null;
 let congressBuiltAt = 0;
 let congressBuild = null;
 const CONGRESS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours — filings update ~daily
-const CONGRESS_WINDOW_DAYS = 120;  // only parse filings disclosed in the last ~4 months
+const CONGRESS_WINDOW_DAYS = 365; // parse filings disclosed in the last ~12 months —
+// but coverage is also bounded by the current-year ZIP (see buildCongressIndex): we only
+// download THIS year's disclosure feed, so early in a calendar year the effective window
+// is "Jan 1 → today", not a true rolling 365 days. Spanning the prior year is deferred.
 const CONGRESS_PDF_CONCURRENCY = 6; // how many PDFs to download/parse at once
 
 // ---------- The actual endpoint ----------
@@ -503,6 +506,11 @@ async function mapWithConcurrency(items, limit, worker) {
 // This is the expensive part (one HTTP request per PDF), so it runs at most once
 // per cache window; callers go through getCongressIndex(), not this directly.
 async function buildCongressIndex() {
+  // We download only the current calendar year's feed. This caps real coverage: the
+  // CONGRESS_WINDOW_DAYS cutoff can reach back 12 months, but the ZIP and PDF folder
+  // below only hold this year's filings, so the prior year is invisible until we also
+  // fetch ${year - 1}'s feed (deferred — it doubles the cold-start PDF count early in
+  // the year). Net effect today: the window surfaces all of this year, nothing before.
   const year = new Date().getFullYear();
   const zipUrl = `https://disclosures-clerk.house.gov/public_disc/financial-pdfs/${year}FD.zip`;
 
@@ -593,7 +601,7 @@ app.get('/api/congress/:ticker', async (req, res) => {
 
   try {
     const index = await getCongressIndex();
-    const trades = (index[ticker] || []).slice(0, 10); // cap what we send the UI
+    const trades = (index[ticker] || []).slice(0, 25); // cap what we send the UI
     res.json({
       ticker,
       trades,

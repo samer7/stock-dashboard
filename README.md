@@ -2,17 +2,17 @@
 
 A personal stock market dashboard for tracking trends, technical signals, and congressional trading activity.
 
-> **Status:** Prototype. UI shows **live prices** and **real MA-based signals** for the watchlist via a deployed backend. Congressional trades, signal history, and some metrics are still simulated — see "Honest state" below.
+> **Status:** Prototype. UI shows **live prices**, **real MA-based signals**, real **RSI/MACD**, and real **House congressional trades** for the watchlist via a deployed backend. The signal history log and a couple of metrics are still simulated — see "Honest state" below.
 
 ---
 
 ## What it does (today)
 
 - Watchlist of tracked tickers rendered as cards with price, daily change, and a signal badge
-- Sparkline per card for quick visual trend (currently synthetic — see "Honest state" below)
+- Sparkline per card for quick visual trend, drawn from real 30-day closes and colored by the 30-day trend
 - BUY / HOLD / SELL badges with signal-change indicators (e.g. HOLD → BUY)
 - Expandable detail view per ticker with 52w high/low, volume, market cap, and signal reasoning
-- Congressional trade activity per ticker (STOCK Act disclosures, currently simulated)
+- Congressional trade activity per ticker (real U.S. House STOCK Act disclosures)
 - Signal history log per ticker
 - Watchlist persists across sessions via `localStorage`
 
@@ -26,12 +26,13 @@ Being upfront about what's real and what isn't, because the line matters:
 | Watchlist persistence | ✅ | |
 | Price, change, change % | ✅ live from Finnhub via backend | |
 | Moving average signals (MA20/50/200) | ✅ computed server-side from Twelve Data history | |
+| RSI (14) / MACD (12/26/9) | ✅ computed server-side from the same closes | |
 | Sparkline data | ✅ real 30-day closing prices | |
-| Volume, market cap, 52w high/low | | ⚠️ hardcoded |
-| Congressional trades | | ⚠️ hardcoded sample data |
+| Volume, 52w high/low | ✅ from Twelve Data history | |
+| Congressional trades (House) | ✅ real U.S. House Clerk disclosures | |
 | Signal history log | | ⚠️ hardcoded |
 
-Price, change, and change % are real (Finnhub via the backend). Signals are real too: the backend pulls ~250 daily closes from Twelve Data, computes MA20/MA50/MA200, and derives BUY/HOLD/SELL with reason text from the actual price-vs-MA relationships. Sparklines draw real 30-day closing prices. Still hand-written: congressional trades, the signal history log, and the 52w/volume/market-cap metrics. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; data-accuracy review is deferred.)
+Price, change, and change % are real (Finnhub via the backend). Signals are real too: the backend pulls ~250 daily closes from Twelve Data, computes MA20/MA50/MA200 plus RSI(14) and MACD(12/26/9), and derives BUY/HOLD/SELL with reason text from the actual price-vs-MA relationships. Sparklines draw real 30-day closing prices, and 52w high/low and volume come from the same history. Congressional trades are real U.S. House STOCK Act disclosures parsed from the House Clerk feed (House only; Senate deferred). The only hand-written piece left is the signal history log. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; data-accuracy review is deferred.)
 
 ---
 
@@ -75,7 +76,7 @@ The critical phase: real price data flowing end-to-end.
 - ✅ RSI (14) / MACD (12/26/9) indicators — computed server-side from the closes already fetched for the moving averages (no extra API calls); shown in the detail panel with color-coded labels
 - ✅ Real congressional disclosures (House) — built from the official U.S. House Clerk feed (free, no API key), parsing each recent PTR PDF server-side and bucketing stock trades by ticker. Paid options (Quiver, FMP, Finnhub) were all rejected as not-free; the community "stock-watcher" datasets are abandoned (last updated 2021).
 - ✅ Sparkline color reflects the 30-day trend rather than today's price change
-- 🔲 Widen congress coverage (quick wins): parse window 120 → 365 days; per-ticker display cap 10 → 25
+- ✅ Widen congress coverage: parse window 120 → 365 days; per-ticker display cap 10 → 25 (window is bounded by the current-year disclosure feed — early in a calendar year it effectively spans "Jan 1 → today"; spanning the prior year's feed is deferred)
 - 🔲 Capture clean tickers on **any** asset type, not just `[ST]` — picks up exchange-traded funds/ETFs that filers tag differently
 - 🔲 Surface **untickered** disclosures (bonds, private/managed funds, structured products) as an aggregate count so that activity isn't invisible — most non-stock holdings have no market ticker and can't be matched, but they should still be visible
 - 🔲 "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings, so a feed reads far more substantial than per-ticker slices)
