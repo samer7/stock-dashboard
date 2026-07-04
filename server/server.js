@@ -441,8 +441,10 @@ app.get('/api/history/:ticker', async (req, res) => {
 //      without a ticker are skipped so we never mis-attribute a trade.
 
 // Compact a dollar figure like 15001 into "$15K" / "$1.5M" for display.
+// Band floors are off-by-one ($1,000,001), so round to one decimal and let
+// whole numbers drop the ".0" — 1000001 → "$1M", 1500000 → "$1.5M".
 function abbreviateDollars(n) {
-  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0) + 'M';
+  if (n >= 1_000_000) return '$' + Math.round(n / 100_000) / 10 + 'M';
   if (n >= 1_000) return '$' + Math.round(n / 1_000) + 'K';
   return '$' + n;
 }
@@ -465,31 +467,67 @@ function formatTxDate(mdy) {
   return `${months[m - 1]} ${d}`;
 }
 
-// Pull the stock transactions out of one PTR's extracted text. We only match the
-// "(TICKER) [ST]" rows — a ticker in parentheses immediately followed by the
-// [ST] "stock" asset-type tag — which is the unambiguous, machine-readable case.
+// Pull the tickered transactions out of one PTR's extracted text. We match any
+// "(TICKER) [XX]" row — a ticker in parentheses immediately followed by a
+// two-letter asset-type tag — which is the unambiguous, machine-readable case.
 //
 // In the PDF text a row looks like (after whitespace is collapsed):
 //   "... Common Stock (NFLX) [ST] S 12/12/202501/06/2026$1,001 - $15,000"
 // i.e. ticker, then the type letter (P purchase / S sale / E exchange), then the
 // transaction date glued to the notification date, then the amount range.
+//
+// Asset tags, surveyed against the full 2026 corpus: ~99% of tickered rows are
+// [ST] stock — which is also how filers tag ETFs, so ETFs were already covered.
+// We now keep the other tickered types too ([OT] other, [PS] non-public stock,
+// [RS] restricted, [AB] LP units, ...), passing the tag along so the UI can
+// label them. Two tags stay excluded on purpose:
+//   [OP] options — a bought put is bearish on the underlying, so showing it as
+//        a plain "Buy" would mislead;
+//   [CT] crypto — symbols collide with real stock tickers (e.g. (ETH) the coin
+//        vs. ETH, Ethan Allen on the NYSE), so we'd mis-attribute trades.
+const SKIPPED_ASSET_TAGS = new Set(['OP', 'CT']);
+
 function parseStockTransactions(text) {
   const flat = text.replace(/\s+/g, ' ');
-  const re = /\(([A-Z.]{1,5})\)\s*\[ST\]\s*(P|S|E)(?:\s*\(partial\))?\s*(\d{2}\/\d{2}\/\d{4})\d{2}\/\d{2}\/\d{4}\$([\d,]+)\s*-\s*\$?([\d,]+)?/g;
+  const re = /\(([A-Z.]{1,5})\)\s*\[([A-Z]{2})\]\s*(P|S|E)(?:\s*\(partial\))?\s*(\d{2}\/\d{2}\/\d{4})\d{2}\/\d{2}\/\d{4}\$([\d,]+)\s*-\s*\$?([\d,]+)?/g;
   const out = [];
   let m;
   while ((m = re.exec(flat)) !== null) {
-    const [, ticker, typeCode, txDate, lo, hi] = m;
+    const [, ticker, asset, typeCode, txDate, lo, hi] = m;
     if (typeCode === 'E') continue; // exchanges aren't a clear buy/sell — skip
+    if (SKIPPED_ASSET_TAGS.has(asset)) continue;
     out.push({
       ticker,
+      asset, // two-letter tag; the frontend labels anything that isn't [ST]
       type: typeCode === 'P' ? 'Buy' : 'Sell',
       range: formatRange(lo, hi),
+      lo: parseInt(lo.replace(/,/g, ''), 10), // band floor — orders the size breakdown
       date: formatTxDate(txDate),
       txDate, // raw mm/dd/yyyy, kept for sorting
     });
   }
   return out;
+}
+
+// Aggregate trades into the disclosure's fixed dollar bands ("$1K–$15K", …),
+// counting buys and sells per band, ordered smallest band first. PTRs never
+// disclose exact amounts — the bands ARE the size data, so a distribution
+// across them is the most honest "how big were these trades" view possible.
+function bandBreakdown(trades) {
+  const byRange = new Map();
+  for (const t of trades) {
+    let b = byRange.get(t.range);
+    if (!b) { b = { range: t.range, lo: t.lo, buys: 0, sells: 0 }; byRange.set(t.range, b); }
+    b[t.type === 'Buy' ? 'buys' : 'sells']++;
+  }
+  return [...byRange.values()]
+    .sort((a, b) => a.lo - b.lo)
+    .map(({ lo, ...band }) => band); // lo was only needed for ordering
+}
+
+// Strip internal-only fields before a trade goes out in an API response.
+function publicTrade({ lo, ...t }) {
+  return t;
 }
 
 // Run an async worker over `items` with at most `limit` in flight at once. This
@@ -561,7 +599,9 @@ async function buildCongressIndex() {
           name: f.name,
           district: f.district,
           type: tx.type,
+          asset: tx.asset,
           range: tx.range,
+          lo: tx.lo, // internal: orders the band breakdown; stripped by publicTrade()
           date: tx.date,
           txDate: tx.txDate,
         });
@@ -623,9 +663,10 @@ async function getCongressIndex() {
 app.get('/api/congress/recent', async (req, res) => {
   try {
     const index = await getCongressIndex();
+    const trades = index.recent.map(publicTrade);
     res.json({
-      trades: index.recent,
-      count: index.recent.length,
+      trades,
+      count: trades.length,
       builtAt: new Date(congressBuiltAt).toISOString(),
       source: 'U.S. House Clerk financial disclosures (House only)',
     });
@@ -647,11 +688,16 @@ app.get('/api/congress/:ticker', async (req, res) => {
 
   try {
     const index = await getCongressIndex();
-    const trades = (index.byTicker[ticker] || []).slice(0, 25); // cap what we send the UI
+    const all = index.byTicker[ticker] || [];
+    const trades = all.slice(0, 25).map(publicTrade); // cap what we send the UI
     res.json({
       ticker,
       trades,
       count: trades.length,
+      total: all.length, // real total in the window, since `trades` is capped
+      // Size distribution across ALL of this ticker's trades in the window
+      // (not just the capped list): [{ range, buys, sells }], smallest first.
+      bands: bandBreakdown(all),
       builtAt: new Date(congressBuiltAt).toISOString(),
       source: 'U.S. House Clerk financial disclosures (House only)',
     });

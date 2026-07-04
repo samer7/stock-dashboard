@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.7.0] - 2026-07-04
+### Added
+- Trade-size band breakdown per ticker: `/api/congress/:ticker` now returns `bands` — buy/sell counts per disclosure dollar band ($1K–$15K … $50M+), computed over ALL of the ticker's trades in the window — plus `total` (the uncapped trade count). The detail panel renders it as thin green/red meters with counts written in text (buys always the left segment, so meaning never rests on color alone; the green/red pair was validated for colorblind separation)
+- Feed summary rows now carry a size cue: "mostly $1K–$15K" / exact band / "mixed sizes"
+- Ticker capture widened from `[ST]`-only to any asset-type tag, with the tag passed through as `asset` and labeled in the UI (e.g. "Buy · restricted"). Two tags are excluded deliberately: `[OP]` options (a bought put is bearish on the underlying — a plain "Buy" would mislead) and `[CT]` crypto (symbols collide with real stock tickers: `(ETH)` the coin vs. Ethan Allen, NYSE: ETH)
+
+### Notes
+- Surveyed the full 2026 PTR corpus before implementing: the `[EF]` ETF tag occurs ZERO times — filers tag ETFs `[ST]`, so ETFs were already captured and the roadmap's original assumption was wrong. The widening actually adds the rarer tickered types: `[OT]` 6, `[PS]` 2, `[RS]` 2, `[AB]` 1 rows this year (e.g. a $5M–$25M restricted-stock buy previously invisible). One `NYSEARCA: DIA`-format row exists corpus-wide; deliberately not parsed (a rule for one row would be overfitting)
+- `abbreviateDollars` now renders band floors cleanly ($1,000,001 → "$1M", not "$1.0M")
+- PTRs disclose ranges, never exact amounts — the band distribution is the most honest size view possible, and the UI says "this year" to match the actual window
+
+---
+
 ## [0.6.0] - 2026-07-04
 ### Added
 - "Recent House activity" feed: a new `GET /api/congress/recent` endpoint serving the newest 100 disclosed trades across ALL tickers and members, built from the same parsed index as the per-ticker data (no extra PDF work). Rendered as a panel below the watchlist, independent of which tickers you track

@@ -87,6 +87,17 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .feed-ticker { font-weight: 600; }
 .feed-group { flex-wrap: wrap; }
 .feed-group-tickers { flex-basis: 100%; font-size: 11px; color: #999; margin-top: 2px; }
+
+/* Trade-size band breakdown: one thin meter per disclosure band. Buys are
+   always the left (green) segment and counts are written out in text, so the
+   meaning never rests on color alone. */
+.band-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 11px; }
+.band-label { color: #888; flex: 0 0 92px; text-align: right; }
+.band-meter { flex: 1; display: flex; gap: 2px; align-items: center; }
+.band-seg { height: 8px; border-radius: 3px; }
+.band-buy { background: #2d9e6b; }
+.band-sell { background: #d94040; }
+.band-count { color: #888; flex: 0 0 auto; }
 </style>
 </head>
 <body>
@@ -159,7 +170,7 @@ function makeStock() {
     // congressStatus starts as 'loading' because refreshCongress always runs
     // right after a card is created — the pill shouldn't claim "no activity"
     // before we've actually looked.
-    congress: [], congressStatus: 'loading',
+    congress: [], congressBands: [], congressTotal: null, congressStatus: 'loading',
     quoteStatus: 'loading',
   };
 }
@@ -265,6 +276,8 @@ async function refreshCongress(ticker) {
     if (!res.ok) throw new Error('bad status');
     const data = await res.json();
     STOCKS[ticker].congress = Array.isArray(data.trades) ? data.trades : [];
+    STOCKS[ticker].congressBands = Array.isArray(data.bands) ? data.bands : [];
+    STOCKS[ticker].congressTotal = typeof data.total === 'number' ? data.total : null;
     STOCKS[ticker].congressStatus = 'loaded';
   } catch (e) {
     STOCKS[ticker].congressStatus = 'error';
@@ -306,19 +319,26 @@ async function refreshActivityFeed() {
         return `
           <div class="congress-item">
             <div><span class="congress-name">${esc(t.name)}</span><span class="congress-meta"> · ${esc(t.district || '')}</span></div>
-            <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)} <span class="feed-ticker">${esc(t.ticker)}</span></span><span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
+            <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)} <span class="feed-ticker">${esc(t.ticker)}</span></span>${assetSuffix(t)}<span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
           </div>`;
       }
       // Multiple same-day trades collapse into a summary row + a ticker list.
       const buys = g.trades.filter(t => t.type === 'Buy').length;
       const sells = g.trades.length - buys;
       const summary = [buys && `${buys} buy${buys > 1 ? 's' : ''}`, sells && `${sells} sell${sells > 1 ? 's' : ''}`].filter(Boolean).join(', ');
+      // Which disclosure band did most of the day's trades fall in? Gives the
+      // summary row a size cue without pretending we know exact amounts.
+      const bandCounts = {};
+      g.trades.forEach(t => { bandCounts[t.range] = (bandCounts[t.range] || 0) + 1; });
+      const [domBand, domCount] = Object.entries(bandCounts).sort((a, b) => b[1] - a[1])[0];
+      const sizeNote = Object.keys(bandCounts).length === 1 ? domBand
+        : domCount > g.trades.length / 2 ? `mostly ${domBand}` : 'mixed sizes';
       const tickers = [...new Set(g.trades.map(t => t.ticker))];
       const shown = tickers.slice(0, 8).join(', ') + (tickers.length > 8 ? ` +${tickers.length - 8} more` : '');
       return `
         <div class="congress-item feed-group">
           <div><span class="congress-name">${esc(g.name)}</span><span class="congress-meta"> · ${esc(g.district || '')}</span></div>
-          <div><span class="congress-meta">${esc(summary)} · ${esc(g.date)}</span></div>
+          <div><span class="congress-meta">${esc(summary)} · ${esc(sizeNote)} · ${esc(g.date)}</span></div>
           <div class="feed-group-tickers">${esc(shown)}</div>
         </div>`;
     }).join('')
@@ -420,10 +440,41 @@ function macdTag(m) {
   return { text: `${sign}${fmtNum(m.macd)} · ${mood}`, color };
 }
 
+// Human labels for the House disclosure asset-type tags. [ST] stock is the
+// default and gets no label; anything else is called out so a restricted-stock
+// or LP-unit trade never masquerades as a plain share purchase. Options [OP]
+// and crypto [CT] are excluded server-side and never reach the UI.
+const ASSET_LABELS = { OT: 'other', PS: 'non-public', RS: 'restricted', AB: 'LP units', GS: 'bond', CS: 'bond', MF: 'fund', EF: 'ETF', VA: 'annuity' };
+function assetSuffix(t) {
+  if (!t.asset || t.asset === 'ST') return '';
+  return `<span class="congress-meta"> · ${esc(ASSET_LABELS[t.asset] || t.asset)}</span>`;
+}
+
+// Build the trade-size distribution for the detail panel: one thin horizontal
+// meter per disclosure band, buys (green) left, sells (red) right, scaled to
+// the busiest band. PTRs only disclose dollar RANGES, so a distribution across
+// those bands is the most honest size view possible — no fake precision.
+function renderBands(d) {
+  const bands = d.congressBands || [];
+  if (d.congressStatus !== 'loaded' || bands.length === 0) return '';
+  const max = Math.max(...bands.map(b => b.buys + b.sells));
+  const rows = bands.map(b => {
+    const seg = (n, cls) => n ? `<span class="band-seg ${cls}" style="flex:0 0 ${(n / max * 100).toFixed(1)}%;"></span>` : '';
+    const text = [b.buys && `${b.buys} buy${b.buys > 1 ? 's' : ''}`, b.sells && `${b.sells} sell${b.sells > 1 ? 's' : ''}`].filter(Boolean).join(' · ');
+    return `<div class="band-row">
+      <span class="band-label">${esc(b.range)}</span>
+      <span class="band-meter">${seg(b.buys, 'band-buy')}${seg(b.sells, 'band-sell')}</span>
+      <span class="band-count">${esc(text)}</span>
+    </div>`;
+  }).join('');
+  const totalNote = typeof d.congressTotal === 'number' ? ` <span style="font-weight:400;color:#aaa;">· ${d.congressTotal} trade${d.congressTotal !== 1 ? 's' : ''} this year</span>` : '';
+  return `<div class="section-label" style="margin-top:1rem;">Trade size distribution${totalNote}</div>${rows}`;
+}
+
 // Build the congressional-trades list for the detail panel. Real data comes from
 // refreshCongress() (the House Clerk feed); congressStatus tracks the in-flight
 // fetch so we can show loading/error rather than a misleading empty list. Each
-// trade is { name, district, type, range, date }.
+// trade is { name, district, type, asset, range, date }.
 function renderCongress(d) {
   const cong = d.congress || [];
   if (d.congressStatus === 'loading' && cong.length === 0)
@@ -435,7 +486,7 @@ function renderCongress(d) {
   const rows = cong.map(t => `
     <div class="congress-item">
       <div><span class="congress-name">${esc(t.name)}</span><span class="congress-meta"> · ${esc(t.district || t.committee || '')}</span></div>
-      <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)}</span><span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
+      <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)}</span>${assetSuffix(t)}<span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
     </div>`).join('');
   return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only.</div>';
 }
@@ -476,6 +527,7 @@ function showDetail(ticker) {
       <div class="congress-list">
         ${renderCongress(d)}
       </div>
+      ${renderBands(d)}
       <div class="section-label" style="margin-top:1rem;">Signal history</div>
       <div class="signal-log">
         <div style="font-size:12px;color:#888;">Not tracked yet — signal-change logging is planned for a later phase.</div>
