@@ -80,6 +80,13 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
 .action-btn { display: inline-block; margin-top: 1rem; padding: 0 16px; height: 36px; line-height: 36px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 13px; cursor: pointer; }
 .action-btn:hover { background: #f0f0f0; }
+
+.feed-panel { background: white; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+.feed-title { font-size: 15px; font-weight: 500; margin-bottom: 2px; }
+.feed-sub { font-size: 12px; color: #888; margin-bottom: 12px; }
+.feed-ticker { font-weight: 600; }
+.feed-group { flex-wrap: wrap; }
+.feed-group-tickers { flex-basis: 100%; font-size: 11px; color: #999; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -119,6 +126,14 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   <div id="watchlist-grid" class="grid"></div>
   <div id="empty-state" class="empty-state" style="display:none;">
     No tickers yet. Add one above to get started.
+  </div>
+
+  <div class="feed-panel">
+    <div class="feed-title">Recent House activity</div>
+    <div class="feed-sub">Latest disclosed stock trades across all members — not just your watchlist</div>
+    <div id="feed-list" class="congress-list">
+      <div style="font-size:12px;color:#888;">Loading recent disclosures…</div>
+    </div>
   </div>
 </div>
 
@@ -256,6 +271,61 @@ async function refreshCongress(ticker) {
   }
   renderCard(ticker); // refresh the card's congress pill with real counts
   if (isOpen()) showDetail(ticker);
+}
+
+// Fetches the cross-ticker activity feed: the newest disclosed House trades
+// across all members, not just watchlist tickers. Same backend index as the
+// per-ticker congress data, so the same cold-start caveat applies.
+async function refreshActivityFeed() {
+  const listEl = document.getElementById('feed-list');
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/congress/recent`);
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    const trades = Array.isArray(data.trades) ? data.trades : [];
+    if (trades.length === 0) {
+      listEl.innerHTML = '<div style="font-size:12px;color:#888;">No recent disclosures found.</div>';
+      return;
+    }
+    // Group by member + day. One member rebalancing a portfolio can disclose
+    // dozens of trades dated the same day, which would otherwise flood every
+    // row of the feed — grouped, that becomes one line ("9 buys, 7 sells")
+    // and other members stay visible.
+    const groups = [];
+    const byKey = new Map();
+    for (const t of trades) {
+      const key = t.name + '|' + t.txDate;
+      let g = byKey.get(key);
+      if (!g) { g = { name: t.name, district: t.district, date: t.date, trades: [] }; byKey.set(key, g); groups.push(g); }
+      g.trades.push(t);
+    }
+    listEl.innerHTML = groups.slice(0, 12).map(g => {
+      // A single trade renders as one plain row, same style as the detail panel.
+      if (g.trades.length === 1) {
+        const t = g.trades[0];
+        return `
+          <div class="congress-item">
+            <div><span class="congress-name">${esc(t.name)}</span><span class="congress-meta"> · ${esc(t.district || '')}</span></div>
+            <div><span class="congress-type-${esc(t.type.toLowerCase())}">${esc(t.type)} <span class="feed-ticker">${esc(t.ticker)}</span></span><span class="congress-meta"> · ${esc(t.range)} · ${esc(t.date)}</span></div>
+          </div>`;
+      }
+      // Multiple same-day trades collapse into a summary row + a ticker list.
+      const buys = g.trades.filter(t => t.type === 'Buy').length;
+      const sells = g.trades.length - buys;
+      const summary = [buys && `${buys} buy${buys > 1 ? 's' : ''}`, sells && `${sells} sell${sells > 1 ? 's' : ''}`].filter(Boolean).join(', ');
+      const tickers = [...new Set(g.trades.map(t => t.ticker))];
+      const shown = tickers.slice(0, 8).join(', ') + (tickers.length > 8 ? ` +${tickers.length - 8} more` : '');
+      return `
+        <div class="congress-item feed-group">
+          <div><span class="congress-name">${esc(g.name)}</span><span class="congress-meta"> · ${esc(g.district || '')}</span></div>
+          <div><span class="congress-meta">${esc(summary)} · ${esc(g.date)}</span></div>
+          <div class="feed-group-tickers">${esc(shown)}</div>
+        </div>`;
+    }).join('')
+      + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only · disclosures lag trades by up to 45 days.</div>';
+  } catch (e) {
+    listEl.innerHTML = '<div style="font-size:12px;color:#888;">Couldn’t load the activity feed right now.</div>';
+  }
 }
 
 // ---------- Rendering ----------
@@ -474,6 +544,7 @@ watchlist.forEach(t => {
   refreshSignal(t);    // MA-based signal + real sparkline from Twelve Data
   refreshCongress(t);  // real House congressional trades from the House Clerk feed
 });
+refreshActivityFeed(); // cross-ticker feed of the newest House trades
 </script>
 </body>
 </html>

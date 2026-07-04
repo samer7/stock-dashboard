@@ -70,9 +70,12 @@ const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 // which members traded AAPL we have to read every recent disclosure PDF anyway,
 // so we read them all once, bucket the trades by ticker, and serve from that.
 //
-// `congressIndex` maps TICKER -> array of trade objects. `congressBuild` holds
-// the in-progress build promise so that concurrent requests share one build
-// instead of each kicking off their own (these builds download many PDFs).
+// `congressIndex` holds two views of the same parsed trades:
+//   byTicker — TICKER -> array of trade objects (for /api/congress/:ticker)
+//   recent   — flat newest-first list across ALL tickers (for /api/congress/recent)
+// `congressBuild` holds the in-progress build promise so that concurrent
+// requests share one build instead of each kicking off their own (these
+// builds download many PDFs).
 let congressIndex = null;
 let congressBuiltAt = 0;
 let congressBuild = null;
@@ -82,6 +85,10 @@ const CONGRESS_WINDOW_DAYS = 365; // parse filings disclosed in the last ~12 mon
 // download THIS year's disclosure feed, so early in a calendar year the effective window
 // is "Jan 1 → today", not a true rolling 365 days. Spanning the prior year is deferred.
 const CONGRESS_PDF_CONCURRENCY = 6; // how many PDFs to download/parse at once
+const CONGRESS_FEED_SIZE = 100; // how many trades /api/congress/recent returns.
+// 100 (not ~30) because one member rebalancing a portfolio can file dozens of
+// trades in a single day; the frontend groups by member+day, so it needs a
+// deeper slice to show a *diverse* feed rather than one filer's bulk day.
 
 // ---------- The actual endpoint ----------
 // When the browser sends GET /api/quote/AAPL, Express runs this function.
@@ -569,7 +576,26 @@ async function buildCongressIndex() {
   for (const ticker of Object.keys(index)) {
     index[ticker].sort((a, b) => Date.parse(b.txDate) - Date.parse(a.txDate));
   }
-  return index;
+
+  // 4. Build the flat "recent activity" view from the same trades: every trade
+  // across every ticker, newest-first. This powers the cross-ticker feed —
+  // only ~84 of 435 reps trade individual stocks, so a combined feed reads far
+  // more substantial than any single ticker's slice. We keep only the newest
+  // CONGRESS_FEED_SIZE trades since that's all the endpoint ever serves.
+  // Skip trades dated in the future — those are filer typos (e.g. a real PDF
+  // filed in 2026 listing "12/26/2026" for a December 2025 trade). Sorting
+  // newest-first would otherwise pin such typos to the top of the feed for
+  // months. The one-day grace covers timezone edges around "today".
+  const maxDate = Date.now() + 24 * 60 * 60 * 1000;
+  const recent = [];
+  for (const [ticker, trades] of Object.entries(index)) {
+    for (const t of trades) {
+      if (Date.parse(t.txDate) <= maxDate) recent.push({ ticker, ...t });
+    }
+  }
+  recent.sort((a, b) => Date.parse(b.txDate) - Date.parse(a.txDate));
+
+  return { byTicker: index, recent: recent.slice(0, CONGRESS_FEED_SIZE) };
 }
 
 // Return the cached index, (re)building it if missing or stale. Concurrent
@@ -589,6 +615,26 @@ async function getCongressIndex() {
   return congressBuild;
 }
 
+// GET /api/congress/recent
+// The cross-ticker feed: the newest trades across ALL tickers and filers,
+// straight from the same parsed index. Registered BEFORE /api/congress/:ticker
+// — Express matches routes in definition order, so this literal path must come
+// first or "recent" would be treated as a ticker symbol.
+app.get('/api/congress/recent', async (req, res) => {
+  try {
+    const index = await getCongressIndex();
+    res.json({
+      trades: index.recent,
+      count: index.recent.length,
+      builtAt: new Date(congressBuiltAt).toISOString(),
+      source: 'U.S. House Clerk financial disclosures (House only)',
+    });
+  } catch (err) {
+    console.error('Error building congress index:', err);
+    res.status(502).json({ error: 'Failed to load congressional disclosures' });
+  }
+});
+
 // GET /api/congress/:ticker
 // Returns recent House trades for one ticker, newest-first. The first call after
 // startup (or after the 12h cache expires) triggers a build that downloads many
@@ -601,7 +647,7 @@ app.get('/api/congress/:ticker', async (req, res) => {
 
   try {
     const index = await getCongressIndex();
-    const trades = (index[ticker] || []).slice(0, 25); // cap what we send the UI
+    const trades = (index.byTicker[ticker] || []).slice(0, 25); // cap what we send the UI
     res.json({
       ticker,
       trades,

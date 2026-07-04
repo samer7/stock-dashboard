@@ -27,6 +27,7 @@ Browser (index.html, GitHub Pages)
 - Three data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache); the **U.S. House Clerk** disclosure feed supplies congressional trades (`GET /api/congress/:ticker`, 12h cache, no API key). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
 - `/api/history` computes MA20/MA50/MA200, a BUY/HOLD/SELL signal with reason text, RSI(14), MACD(12/26/9), 52w high/low, and volume server-side, plus a 30-day sparkline of real closes.
 - `/api/congress` downloads the House Clerk's yearly disclosure ZIP, parses each recent PTR PDF (via `pdf-parse`), and buckets stock trades by ticker. House only; ~90% of PTRs are machine-readable (the rest are scanned and skipped); only trades with a clean `(TICKER) [ST]` tag are kept.
+- `GET /api/congress/recent` serves the cross-ticker feed (newest 100 trades from the same index, future-dated filer typos filtered). The route is registered BEFORE `/api/congress/:ticker` so the literal path wins. The frontend groups feed rows by member + day so one filer's bulk rebalance doesn't flood the list.
 - Frontend (`index.html`) fetches all three endpoints per ticker. `BACKEND_URL` constant points at the Render service. Cards start as loading placeholders (no mock data anywhere); persisted watchlist tickers hydrate on reload; invalid tickers show an error state.
 - Nothing is mock anymore. The last mock piece (signal history log) was removed rather than simulated — the UI section says "not tracked yet". (Market cap was removed earlier for the same reason.)
 - Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
@@ -39,7 +40,7 @@ Browser (index.html, GitHub Pages)
 
 Phases 1–3 done. Current and upcoming:
 
-- **Phase 4 — data layers (in progress).** ✅ RSI/MACD, ✅ House congressional trades, ✅ sparkline trend color. Remaining: widen congress coverage (window 120→365d, cap 10→25), capture clean tickers on any asset type (ETFs), surface untickered disclosures as an aggregate, a "recent House activity" feed, a trade-size band breakdown, Senate disclosures (deferred — gated eFD), and news + sentiment.
+- **Phase 4 — data layers (in progress).** ✅ RSI/MACD, ✅ House congressional trades, ✅ sparkline trend color, ✅ widened congress coverage (365d window, 25-trade cap), ✅ "recent House activity" feed. Remaining: capture clean tickers on any asset type (ETFs), surface untickered disclosures as an aggregate, a trade-size band breakdown, Senate disclosures (deferred — gated eFD), and news + sentiment.
 - **Phase 5 — signal rigor & evaluation harness.** Reframed goal: *not* precise prediction (unachievable; even top quant funds win ~51% of trades) but honestly-measured small edges. Build the evaluation harness FIRST (walk-forward/out-of-sample, transaction costs, Brier/log-loss, beat buy-and-hold + random-walk baselines), THEN probabilistic/volatility models, weighted multi-signal scoring, and risk/sizing (Sharpe, Kelly). Guard against lookahead/overfitting/survivorship bias. Note the congressional 45-day delay limits its short-term predictive value.
 - **Phase 6 — paper trading / "simulated run."** Fake-money portfolio following the site's suggestions. Shares ONE simulator core with Phase 5a (backtest = same engine run over history; paper-trade = run forward). 6a manual (localStorage, live-priced, benchmarked vs buy-and-hold); 6b auto-follow = live forward-test.
 - **Phase 7 — UI polish.** **Phase 8 — multi-user** (only if scope expands; a real DB like Supabase enters only here).
@@ -51,7 +52,7 @@ When working on Phase 5/6, keep the owner-is-learning ethos: explain the math, p
 | Path | What it is |
 | --- | --- |
 | `index.html` | The entire frontend. Edit carefully — it's one file. |
-| `server/server.js` | The backend. Endpoints: `GET /api/quote/:ticker` (live), `GET /api/history/:ticker` (history + signal + RSI/MACD), `GET /api/congress/:ticker` (House trades), `GET /health`. |
+| `server/server.js` | The backend. Endpoints: `GET /api/quote/:ticker` (live), `GET /api/history/:ticker` (history + signal + RSI/MACD), `GET /api/congress/recent` (cross-ticker feed), `GET /api/congress/:ticker` (House trades), `GET /health`. |
 | `server/package.json` | Node dependencies (express, cors, dotenv, adm-zip, pdf-parse). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |

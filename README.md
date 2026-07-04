@@ -13,6 +13,7 @@ A personal stock market dashboard for tracking trends, technical signals, and co
 - BUY / HOLD / SELL badges with signal-change indicators (e.g. HOLD → BUY)
 - Expandable detail view per ticker with 52w high/low, volume, market cap, and signal reasoning
 - Congressional trade activity per ticker (real U.S. House STOCK Act disclosures)
+- "Recent House activity" feed — the newest disclosed trades across **all** members, grouped by member and day, independent of the watchlist
 - Watchlist persists across sessions via `localStorage`
 - Loading states while data is fetched (matters on the free-tier backend's ~30s cold start); invalid tickers show a clear error instead of fake numbers
 
@@ -79,7 +80,7 @@ The critical phase: real price data flowing end-to-end.
 - ✅ Widen congress coverage: parse window 120 → 365 days; per-ticker display cap 10 → 25 (window is bounded by the current-year disclosure feed — early in a calendar year it effectively spans "Jan 1 → today"; spanning the prior year's feed is deferred)
 - 🔲 Capture clean tickers on **any** asset type, not just `[ST]` — picks up exchange-traded funds/ETFs that filers tag differently
 - 🔲 Surface **untickered** disclosures (bonds, private/managed funds, structured products) as an aggregate count so that activity isn't invisible — most non-stock holdings have no market ticker and can't be matched, but they should still be visible
-- 🔲 "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings, so a feed reads far more substantial than per-ticker slices)
+- ✅ "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers, served by `GET /api/congress/recent` from the same parsed index. Trades are grouped by member + day in the UI, because one member rebalancing a portfolio can file dozens of same-day trades that would otherwise flood every row (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings). Future-dated filer typos are filtered out so they can't pin themselves to the top
 - 🔲 Trade-size **band breakdown** — distribution across the disclosure bands ($1K–$15K … $50M+), per ticker and/or in the feed
 - 🔲 Senate disclosures — separate eFD system behind a click-through agreement; own mini-project, deferred
 - 🔲 News headlines with sentiment classification
