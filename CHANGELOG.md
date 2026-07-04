@@ -4,6 +4,15 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.7.1] - 2026-07-04
+### Added
+- Unattributed-disclosure aggregate: the parser now counts every transaction row it does NOT surface as a trade (no clean ticker, options, crypto, exchanges) by asset-type tag. `/api/congress/recent` returns it as `unattributed`, and the feed footer renders one honest line: "Not shown: 410 more disclosed transactions with no clean stock ticker — mostly U.S. treasuries (244), corporate bonds (36), other assets (32)." Without this, a member moving millions in treasuries looked inactive
+
+### Fixed
+- Asset labels corrected against the official code list (fd.house.gov/reference/asset-type-codes.aspx): `[AB]` is Asset-Backed Securities (previous "LP units" gloss was wrong — the AllianceBernstein sample was a ticker/tag coincidence), `[RS]` is Restricted Stock Units, `[OI]`/`[OL]` are ownership interests
+
+---
+
 ## [0.7.0] - 2026-07-04
 ### Added
 - Trade-size band breakdown per ticker: `/api/congress/:ticker` now returns `bands` — buy/sell counts per disclosure dollar band ($1K–$15K … $50M+), computed over ALL of the ticker's trades in the window — plus `total` (the uncapped trade count). The detail panel renders it as thin green/red meters with counts written in text (buys always the left segment, so meaning never rests on color alone; the green/red pair was validated for colorblind separation)

@@ -487,16 +487,27 @@ function formatTxDate(mdy) {
 //        vs. ETH, Ethan Allen on the NYSE), so we'd mis-attribute trades.
 const SKIPPED_ASSET_TAGS = new Set(['OP', 'CT']);
 
-function parseStockTransactions(text) {
+// Parse every transaction row in one PTR. The "(TICKER)" prefix is OPTIONAL in
+// the regex: rows that have one (and aren't an excluded/exchange type) become
+// trades; every other row — treasuries, bonds, private funds, options, crypto,
+// exchanges — is counted by asset tag instead of being silently dropped.
+// Roughly 17% of transaction rows have no ticker, so without this count a
+// member could move millions in treasuries and look inactive on the dashboard.
+function parseTransactions(text) {
   const flat = text.replace(/\s+/g, ' ');
-  const re = /\(([A-Z.]{1,5})\)\s*\[([A-Z]{2})\]\s*(P|S|E)(?:\s*\(partial\))?\s*(\d{2}\/\d{2}\/\d{4})\d{2}\/\d{2}\/\d{4}\$([\d,]+)\s*-\s*\$?([\d,]+)?/g;
-  const out = [];
+  const re = /(?:\(([A-Z.]{1,5})\)\s*)?\[([A-Z]{2})\]\s*(P|S|E)(?:\s*\(partial\))?\s*(\d{2}\/\d{2}\/\d{4})\d{2}\/\d{2}\/\d{4}\$([\d,]+)\s*-\s*\$?([\d,]+)?/g;
+  const trades = [];
+  const skipped = {}; // asset tag -> count of rows not shown as trades
   let m;
   while ((m = re.exec(flat)) !== null) {
     const [, ticker, asset, typeCode, txDate, lo, hi] = m;
-    if (typeCode === 'E') continue; // exchanges aren't a clear buy/sell — skip
-    if (SKIPPED_ASSET_TAGS.has(asset)) continue;
-    out.push({
+    // Not attributable as a clean stock trade: no ticker, an excluded type
+    // (options/crypto), or an exchange (neither buy nor sell). Count it.
+    if (!ticker || SKIPPED_ASSET_TAGS.has(asset) || typeCode === 'E') {
+      skipped[asset] = (skipped[asset] || 0) + 1;
+      continue;
+    }
+    trades.push({
       ticker,
       asset, // two-letter tag; the frontend labels anything that isn't [ST]
       type: typeCode === 'P' ? 'Buy' : 'Sell',
@@ -506,7 +517,7 @@ function parseStockTransactions(text) {
       txDate, // raw mm/dd/yyyy, kept for sorting
     });
   }
-  return out;
+  return { trades, skipped };
 }
 
 // Aggregate trades into the disclosure's fixed dollar bands ("$1K–$15K", …),
@@ -586,15 +597,21 @@ async function buildCongressIndex() {
     });
   }
 
-  // 2. Fetch + parse each filing's PDF, bucketing every stock trade by ticker.
+  // 2. Fetch + parse each filing's PDF, bucketing every stock trade by ticker
+  // and tallying the rows we can't attribute (untickered assets, options, …).
   const index = {};
+  const skippedByTag = {};
   await mapWithConcurrency(filings, CONGRESS_PDF_CONCURRENCY, async (f) => {
     const pdfUrl = `https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${year}/${f.docId}.pdf`;
     try {
       const resp = await fetch(pdfUrl);
       if (!resp.ok) return;
       const text = (await pdfParse(Buffer.from(await resp.arrayBuffer()))).text;
-      for (const tx of parseStockTransactions(text)) {
+      const { trades: txs, skipped } = parseTransactions(text);
+      for (const [tag, n] of Object.entries(skipped)) {
+        skippedByTag[tag] = (skippedByTag[tag] || 0) + n;
+      }
+      for (const tx of txs) {
         (index[tx.ticker] ||= []).push({
           name: f.name,
           district: f.district,
@@ -635,7 +652,15 @@ async function buildCongressIndex() {
   }
   recent.sort((a, b) => Date.parse(b.txDate) - Date.parse(a.txDate));
 
-  return { byTicker: index, recent: recent.slice(0, CONGRESS_FEED_SIZE) };
+  // 5. The unattributed aggregate: how many transaction rows in the window we
+  // did NOT surface as trades, by asset tag. Keeps non-stock activity visible
+  // as a count even though it can't be matched to any market ticker.
+  const unattributed = {
+    count: Object.values(skippedByTag).reduce((a, b) => a + b, 0),
+    byTag: skippedByTag,
+  };
+
+  return { byTicker: index, recent: recent.slice(0, CONGRESS_FEED_SIZE), unattributed };
 }
 
 // Return the cached index, (re)building it if missing or stale. Concurrent
@@ -667,6 +692,9 @@ app.get('/api/congress/recent', async (req, res) => {
     res.json({
       trades,
       count: trades.length,
+      // Rows in the window NOT shown as trades (no ticker, options, crypto,
+      // exchanges), counted by asset tag so that activity isn't invisible.
+      unattributed: index.unattributed,
       builtAt: new Date(congressBuiltAt).toISOString(),
       source: 'U.S. House Clerk financial disclosures (House only)',
     });

@@ -286,6 +286,27 @@ async function refreshCongress(ticker) {
   if (isOpen()) showDetail(ticker);
 }
 
+// Friendly names for the asset tags that dominate the unattributed count, per
+// the official code list (fd.house.gov/reference/asset-type-codes.aspx).
+const UNATTR_LABELS = {
+  GS: 'U.S. treasuries', CS: 'corporate bonds', HN: 'private funds',
+  OI: 'ownership interests', OL: 'ownership interests', OP: 'options',
+  CT: 'crypto', VA: 'annuities', PS: 'non-public stock', MF: 'mutual funds',
+  OT: 'other assets', ST: 'stock rows without a clean ticker',
+};
+
+// One honest line under the feed: how much disclosed activity we could NOT
+// attribute to a stock ticker (treasuries, bonds, private funds, plus the
+// deliberately excluded options/crypto). Without this, a member moving
+// millions in treasuries would look inactive on the dashboard.
+function renderUnattributed(u) {
+  if (!u || !u.count) return '';
+  const top = Object.entries(u.byTag || {})
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([tag, n]) => `${UNATTR_LABELS[tag] || tag} (${n})`).join(', ');
+  return `<div style="font-size:11px;color:#aaa;padding:2px 2px;">Not shown: ${u.count} more disclosed transactions with no clean stock ticker${top ? ` — mostly ${esc(top)}` : ''}.</div>`;
+}
+
 // Fetches the cross-ticker activity feed: the newest disclosed House trades
 // across all members, not just watchlist tickers. Same backend index as the
 // per-ticker congress data, so the same cold-start caveat applies.
@@ -342,7 +363,8 @@ async function refreshActivityFeed() {
           <div class="feed-group-tickers">${esc(shown)}</div>
         </div>`;
     }).join('')
-      + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only · disclosures lag trades by up to 45 days.</div>';
+      + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only · disclosures lag trades by up to 45 days.</div>'
+      + renderUnattributed(data.unattributed);
   } catch (e) {
     listEl.innerHTML = '<div style="font-size:12px;color:#888;">Couldn’t load the activity feed right now.</div>';
   }
@@ -440,11 +462,12 @@ function macdTag(m) {
   return { text: `${sign}${fmtNum(m.macd)} · ${mood}`, color };
 }
 
-// Human labels for the House disclosure asset-type tags. [ST] stock is the
-// default and gets no label; anything else is called out so a restricted-stock
-// or LP-unit trade never masquerades as a plain share purchase. Options [OP]
-// and crypto [CT] are excluded server-side and never reach the UI.
-const ASSET_LABELS = { OT: 'other', PS: 'non-public', RS: 'restricted', AB: 'LP units', GS: 'bond', CS: 'bond', MF: 'fund', EF: 'ETF', VA: 'annuity' };
+// Human labels for the House disclosure asset-type tags, per the official code
+// list at fd.house.gov/reference/asset-type-codes.aspx. [ST] stock is the
+// default and gets no label; anything else is called out so an RSU grant or
+// asset-backed security never masquerades as a plain share purchase. Options
+// [OP] and crypto [CT] are excluded server-side and never reach the UI.
+const ASSET_LABELS = { OT: 'other', PS: 'non-public', RS: 'RSUs', AB: 'asset-backed', GS: 'govt bond', CS: 'bond', MF: 'fund', EF: 'ETF', VA: 'annuity', RE: 'REIT', ET: 'ETN' };
 function assetSuffix(t) {
   if (!t.asset || t.asset === 'ST') return '';
   return `<span class="congress-meta"> · ${esc(ASSET_LABELS[t.asset] || t.asset)}</span>`;
