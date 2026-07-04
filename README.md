@@ -2,7 +2,7 @@
 
 A personal stock market dashboard for tracking trends, technical signals, and congressional trading activity.
 
-> **Status:** Prototype. UI shows **live prices**, **real MA-based signals**, real **RSI/MACD**, and real **House congressional trades** for the watchlist via a deployed backend. The signal history log and a couple of metrics are still simulated — see "Honest state" below.
+> **Status:** Prototype. Everything shown is real data via a deployed backend: **live prices**, **MA-based signals**, **RSI/MACD**, and **House congressional trades**. Nothing is simulated anymore — the last mock piece (a hand-written signal history log) was removed; that section now honestly says "not tracked yet". See "Honest state" below.
 
 ---
 
@@ -13,8 +13,8 @@ A personal stock market dashboard for tracking trends, technical signals, and co
 - BUY / HOLD / SELL badges with signal-change indicators (e.g. HOLD → BUY)
 - Expandable detail view per ticker with 52w high/low, volume, market cap, and signal reasoning
 - Congressional trade activity per ticker (real U.S. House STOCK Act disclosures)
-- Signal history log per ticker
 - Watchlist persists across sessions via `localStorage`
+- Loading states while data is fetched (matters on the free-tier backend's ~30s cold start); invalid tickers show a clear error instead of fake numbers
 
 ## Honest state of the project
 
@@ -30,9 +30,9 @@ Being upfront about what's real and what isn't, because the line matters:
 | Sparkline data | ✅ real 30-day closing prices | |
 | Volume, 52w high/low | ✅ from Twelve Data history | |
 | Congressional trades (House) | ✅ real U.S. House Clerk disclosures | |
-| Signal history log | | ⚠️ hardcoded |
+| Signal history log | — not built yet | (was hardcoded; the fake log was removed) |
 
-Price, change, and change % are real (Finnhub via the backend). Signals are real too: the backend pulls ~250 daily closes from Twelve Data, computes MA20/MA50/MA200 plus RSI(14) and MACD(12/26/9), and derives BUY/HOLD/SELL with reason text from the actual price-vs-MA relationships. Sparklines draw real 30-day closing prices, and 52w high/low and volume come from the same history. Congressional trades are real U.S. House STOCK Act disclosures parsed from the House Clerk feed (House only; Senate deferred). The only hand-written piece left is the signal history log. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; data-accuracy review is deferred.)
+Price, change, and change % are real (Finnhub via the backend). Signals are real too: the backend pulls ~250 daily closes from Twelve Data, computes MA20/MA50/MA200 plus RSI(14) and MACD(12/26/9), and derives BUY/HOLD/SELL with reason text from the actual price-vs-MA relationships. Sparklines draw real 30-day closing prices, and 52w high/low and volume come from the same history. Congressional trades are real U.S. House STOCK Act disclosures parsed from the House Clerk feed (House only; Senate deferred). Nothing is simulated anymore: cards show a loading state until real data arrives, and the signal history section says "not tracked yet" instead of displaying an invented log. (Note: Finnhub free-tier prices run ~2% off the official regular-session close; data-accuracy review is deferred.)
 
 ---
 

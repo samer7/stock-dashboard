@@ -37,14 +37,15 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .stock-card:hover { border-color: #bbb; }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .card-ticker { font-size: 16px; font-weight: 500; }
-.card-name { font-size: 12px; color: #888; margin-top: 2px; }
 
 .signal-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 6px; }
 .badge-buy { background: #e8f7ef; color: #1a7a4a; }
 .badge-sell { background: #fdeaea; color: #b83030; }
 .badge-hold { background: #fdf6e3; color: #8a6200; }
+.badge-loading { background: #f0f0f0; color: #999; }
 
 .card-price { font-size: 22px; font-weight: 500; margin-bottom: 2px; }
+.card-price.muted { color: #bbb; }
 .card-change { font-size: 13px; }
 .up { color: #2d9e6b; } .down { color: #d94040; }
 
@@ -95,7 +96,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    Live prices, MA-based signals, 52w metrics, and House congressional trades are real · signal history is still simulated.
+    All data shown is real: live prices, MA-based signals, 52w metrics, and House congressional trades · signal history isn’t tracked yet. First load can take ~30s while the free-tier backend wakes up.
   </div>
 
   <div class="add-row">
@@ -124,108 +125,40 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 <script>
 // ---------- Data ----------
 // Single consolidated store keyed by ticker. Each entry holds the quote,
-// congressional trades, and signal log together so it maps cleanly onto
-// a future API response shape.
-const STOCKS = {
-  AAPL: {
-    name: 'Apple Inc.', price: 213.49, change: 2.14, changePct: 1.01,
-    high52: 237.23, low52: 164.08, volume: 58400000, marketCap: 3.28e12,
-    signal: { label: 'BUY', reason: 'Price above MA20, MA50, and MA200 — bullish alignment across all timeframes.' },
-    prevSignal: 'HOLD',
-    congress: [
-      { name: 'Sen. J. Smith', committee: 'Finance', type: 'Buy', range: '$50k–$100k', date: 'Apr 18' },
-      { name: 'Rep. A. Torres', committee: 'Science & Tech', type: 'Buy', range: '$15k–$50k', date: 'Apr 2' },
-    ],
-    log: [
-      { date: 'Apr 12', signal: 'BUY', note: 'MA20 crossed above MA50' },
-      { date: 'Mar 28', signal: 'HOLD', note: 'Mixed moving averages' },
-      { date: 'Mar 10', signal: 'BUY', note: 'Price broke above MA200' },
-    ],
-  },
-  MSFT: {
-    name: 'Microsoft Corp.', price: 427.83, change: -1.22, changePct: -0.28,
-    high52: 468.35, low52: 344.79, volume: 21300000, marketCap: 3.18e12,
-    signal: { label: 'HOLD', reason: 'Price above MA20 but below MA50 — mixed signals.' },
-    prevSignal: 'HOLD',
-    congress: [
-      { name: 'Rep. L. Chen', committee: 'Science & Tech', type: 'Buy', range: '$100k–$250k', date: 'Apr 22' },
-    ],
-    log: [
-      { date: 'Apr 20', signal: 'HOLD', note: 'Mixed moving averages' },
-      { date: 'Apr 1', signal: 'BUY', note: 'MA20 above MA50 and MA200' },
-      { date: 'Mar 15', signal: 'HOLD', note: 'Price near MA20' },
-    ],
-  },
-  NVDA: {
-    name: 'NVIDIA Corp.', price: 897.42, change: 18.76, changePct: 2.13,
-    high52: 974.00, low52: 435.21, volume: 142000000, marketCap: 2.21e12,
-    signal: { label: 'BUY', reason: 'Price above MA20, MA50, and MA200 — strong bullish alignment.' },
-    prevSignal: 'BUY',
-    congress: [
-      { name: 'Sen. M. Davis', committee: 'Armed Services', type: 'Buy', range: '$50k–$100k', date: 'Apr 10' },
-      { name: 'Rep. K. Wells', committee: 'Science & Tech', type: 'Sell', range: '$15k–$50k', date: 'Mar 28' },
-    ],
-    log: [
-      { date: 'Apr 18', signal: 'BUY', note: 'Strong bullish alignment' },
-      { date: 'Mar 22', signal: 'HOLD', note: 'Price pulled back to MA20' },
-      { date: 'Mar 5', signal: 'BUY', note: 'MA20 crossed MA50' },
-    ],
-  },
-  GOOGL: {
-    name: 'Alphabet Inc.', price: 178.32, change: -0.88, changePct: -0.49,
-    high52: 207.05, low52: 130.67, volume: 24100000, marketCap: 2.19e12,
-    signal: { label: 'HOLD', reason: 'Price near MA20 — neutral, watching for breakout.' },
-    prevSignal: 'SELL',
-    congress: [
-      { name: 'Sen. J. Smith', committee: 'Finance', type: 'Sell', range: '$15k–$50k', date: 'Apr 5' },
-    ],
-    log: [
-      { date: 'Apr 21', signal: 'HOLD', note: 'Price near MA20' },
-      { date: 'Apr 3', signal: 'SELL', note: 'Price fell below MA50' },
-      { date: 'Mar 18', signal: 'HOLD', note: 'Mixed signals' },
-    ],
-  },
-  META: {
-    name: 'Meta Platforms', price: 524.11, change: 7.33, changePct: 1.42,
-    high52: 589.02, low52: 349.28, volume: 17800000, marketCap: 1.33e12,
-    signal: { label: 'BUY', reason: 'Price 4.2% above MA20 — short-term momentum positive.' },
-    prevSignal: 'HOLD',
-    congress: [
-      { name: 'Rep. A. Torres', committee: 'Energy & Commerce', type: 'Buy', range: '$1k–$15k', date: 'Apr 19' },
-    ],
-    log: [
-      { date: 'Apr 19', signal: 'BUY', note: 'Momentum above MA20' },
-      { date: 'Apr 5', signal: 'HOLD', note: 'Consolidating near MA20' },
-      { date: 'Mar 20', signal: 'BUY', note: 'MA20 above MA50' },
-    ],
-  },
-  AMZN: {
-    name: 'Amazon.com Inc.', price: 192.45, change: -2.01, changePct: -1.03,
-    high52: 225.49, low52: 151.61, volume: 39500000, marketCap: 2.03e12,
-    signal: { label: 'SELL', reason: 'Price below MA20 and MA50 — bearish short-term trend.' },
-    prevSignal: 'HOLD',
-    congress: [
-      { name: 'Sen. M. Davis', committee: 'Finance', type: 'Sell', range: '$50k–$100k', date: 'Apr 14' },
-      { name: 'Rep. L. Chen', committee: 'Science & Tech', type: 'Sell', range: '$15k–$50k', date: 'Apr 1' },
-    ],
-    log: [
-      { date: 'Apr 22', signal: 'SELL', note: 'Price below MA20 and MA50' },
-      { date: 'Apr 8', signal: 'HOLD', note: 'Mixed signals' },
-      { date: 'Mar 25', signal: 'BUY', note: 'Price above all MAs' },
-    ],
-  },
-};
+// signal, and congressional trades together, all filled in by the backend.
+// Entries start as empty "loading" placeholders (see makeStock) — there is
+// no mock data. Cards render a loading state until each fetch resolves,
+// which matters because Render's free tier cold-starts in ~30s.
+const STOCKS = {};
+
+// A fresh placeholder entry. Every field is null/empty until the matching
+// fetch fills it in; renderCard/showDetail treat null as "still loading".
+// quoteStatus tracks the price fetch: 'loading' → 'loaded' | 'error'
+// ('error' usually means the ticker doesn't exist).
+function makeStock() {
+  return {
+    price: null, change: null, changePct: null,
+    high52: null, low52: null, volume: null,
+    signal: null, prevSignal: null,
+    rsi: null, macd: null,
+    // congressStatus starts as 'loading' because refreshCongress always runs
+    // right after a card is created — the pill shouldn't claim "no activity"
+    // before we've actually looked.
+    congress: [], congressStatus: 'loading',
+    quoteStatus: 'loading',
+  };
+}
 
 let watchlist = JSON.parse(localStorage.getItem('watchlist_v1') || 'null') || ['AAPL', 'MSFT', 'NVDA', 'GOOGL'];
 const sparkCharts = {};
-const sparkData = {}; // cached so sparklines don't re-randomize on every render
+const sparkData = {}; // real 30-day closes per ticker, filled in by refreshSignal
 
 const BACKEND_URL = 'https://samer7-stock-api.onrender.com';
 
 // ---------- Helpers ----------
 function saveWatchlist() { localStorage.setItem('watchlist_v1', JSON.stringify(watchlist)); }
 function fmtNum(n, d = 2) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function fmtVol(n) { if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'; return n; }
+function fmtVol(n) { if (typeof n !== 'number') return '—'; if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'; return n; }
 
 // Tickers can only be letters and a dot (for symbols like BRK.B). Anything else is rejected.
 function sanitizeTicker(raw) {
@@ -240,23 +173,9 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Returns the sparkline points for a ticker. Once refreshSignal has fetched
-// real closing prices, those are cached in sparkData and used directly. Until
-// then (or for tickers with no live data), fall back to a seeded random walk
-// so the card still draws something instead of an empty box.
-function getSparkline(ticker) {
-  if (sparkData[ticker]) return sparkData[ticker];
-  const d = STOCKS[ticker];
-  const pts = [];
-  let p = d.price - d.change * 6;
-  // Seeded pseudo-random from ticker name so the same ticker always draws the same line.
-  let seed = [...ticker].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-  for (let i = 0; i < 14; i++) { p += (rand() - 0.48) * d.price * 0.008; pts.push(parseFloat(p.toFixed(2))); }
-  pts.push(parseFloat(d.price.toFixed(2)));
-  sparkData[ticker] = pts;
-  return pts;
-}
+// Format a possibly-missing dollar value. null means "still loading" (or
+// genuinely unavailable), which renders as an em dash rather than $0.00.
+function fmtMoney(v) { return typeof v === 'number' ? '$' + fmtNum(v) : '—'; }
 
 // ---------- Live data ----------
 async function fetchQuote(ticker) {
@@ -270,10 +189,17 @@ async function fetchQuote(ticker) {
 }
 
 // Fetches a real quote and updates the card's price in place. Signal and
-// sparkline come from refreshSignal (real history); congress/log stay mock.
+// sparkline come from refreshSignal (real history); congress from refreshCongress.
 async function refreshLiveQuote(ticker) {
   const data = await fetchQuote(ticker);
-  if (!data) return;
+  if (!data) {
+    // No quote — most likely an invalid ticker (backend returns 404), or the
+    // backend is unreachable. Either way, stop showing "loading" forever.
+    STOCKS[ticker].quoteStatus = 'error';
+    renderCard(ticker);
+    return;
+  }
+  STOCKS[ticker].quoteStatus = 'loaded';
   STOCKS[ticker].price = data.price;
   STOCKS[ticker].change = data.change;
   STOCKS[ticker].changePct = data.changePct;
@@ -345,24 +271,42 @@ function renderCard(ticker) {
   let card = document.getElementById('card-' + ticker);
   if (!card) { card = document.createElement('div'); card.className = 'stock-card'; card.id = 'card-' + ticker; card.dataset.ticker = ticker; grid.appendChild(card); }
 
-  const up = d.change >= 0;
-  const sign = up ? '+' : '';
-  const badgeClass = d.signal.label === 'BUY' ? 'badge-buy' : d.signal.label === 'SELL' ? 'badge-sell' : 'badge-hold';
-  const changed = d.prevSignal && d.prevSignal !== d.signal.label;
+  const hasQuote = typeof d.price === 'number';
+  const up = hasQuote && d.change >= 0;
+  const sign = up ? '+' : '-'; // explicit sign on both $ and % (values are abs'd below)
+
+  // Signal badge: real label once /api/history resolves, a grey "…" until then.
+  const badgeHtml = d.signal
+    ? `<span class="signal-badge ${d.signal.label === 'BUY' ? 'badge-buy' : d.signal.label === 'SELL' ? 'badge-sell' : 'badge-hold'}">${esc(d.signal.label)}</span>`
+    : '<span class="signal-badge badge-loading">…</span>';
+  const changed = d.signal && d.prevSignal && d.prevSignal !== d.signal.label;
+
+  // Price block: loading text until the quote arrives; an honest error line if
+  // the backend said the ticker has no data (usually a typo'd symbol).
+  const priceHtml = hasQuote
+    ? `<div class="card-price">$${fmtNum(d.price)}</div>
+       <div class="card-change ${up ? 'up' : 'down'}">${sign}$${fmtNum(Math.abs(d.change))} (${sign}${fmtNum(Math.abs(d.changePct))}%)</div>`
+    : d.quoteStatus === 'error'
+      ? `<div class="card-price muted">—</div>
+         <div class="card-change" style="color:#b83030;">Couldn’t load data for this ticker</div>`
+      : `<div class="card-price muted">…</div>
+         <div class="card-change" style="color:#aaa;">Loading live quote…</div>`;
+
   const cong = d.congress || [];
   const buys = cong.filter(t => t.type === 'Buy').length;
-  const congText = cong.length === 0 ? 'No recent activity' : buys > 0 ? `${buys} recent buy${buys > 1 ? 's' : ''}` : 'Recent sells';
+  const congText = d.congressStatus === 'loading' ? 'Loading…'
+    : cong.length === 0 ? 'No recent activity'
+    : buys > 0 ? `${buys} recent buy${buys > 1 ? 's' : ''}` : 'Recent sells';
 
   card.innerHTML = `
     <div class="card-top">
-      <div><div class="card-ticker">${esc(ticker)}</div><div class="card-name">${esc(d.name)}</div></div>
+      <div><div class="card-ticker">${esc(ticker)}</div></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
+        ${badgeHtml}
         ${changed ? `<span style="font-size:10px;color:#888;">${esc(d.prevSignal)}→${esc(d.signal.label)}</span>` : ''}
       </div>
     </div>
-    <div class="card-price">$${fmtNum(d.price)}</div>
-    <div class="card-change ${up ? 'up' : 'down'}">${sign}$${fmtNum(Math.abs(d.change))} (${sign}${fmtNum(d.changePct)}%)</div>
+    ${priceHtml}
     <div class="sparkline-wrap"><canvas id="spark-${esc(ticker)}" role="img" aria-label="30-day price sparkline for ${esc(ticker)}">30-day trend</canvas></div>
     <div class="card-footer">
       <span class="congress-pill"><span class="congress-dot"></span>Congress: ${esc(congText)}</span>
@@ -371,11 +315,13 @@ function renderCard(ticker) {
 
   setTimeout(() => {
     const canvas = document.getElementById('spark-' + ticker); if (!canvas) return;
-    if (sparkCharts[ticker]) sparkCharts[ticker].destroy();
-    const pts = getSparkline(ticker);
+    if (sparkCharts[ticker]) { sparkCharts[ticker].destroy(); delete sparkCharts[ticker]; }
+    // Only draw once refreshSignal has cached real closes — no placeholder line.
+    const pts = sparkData[ticker];
+    if (!pts || pts.length < 2) return;
     // Color by the 30-day trend (last close vs. first), not today's change, so
     // the line matches the shape it's drawing rather than flipping on a down day.
-    const trendUp = pts.length > 1 ? pts[pts.length - 1] >= pts[0] : up;
+    const trendUp = pts[pts.length - 1] >= pts[0];
     sparkCharts[ticker] = new Chart(canvas, {
       type: 'line',
       data: { labels: pts.map((_, i) => i), datasets: [{ data: pts, borderColor: trendUp ? '#2d9e6b' : '#d94040', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }] },
@@ -428,24 +374,28 @@ function showDetail(ticker) {
   const d = STOCKS[ticker]; if (!d) return;
   const panel = document.getElementById('detail-panel');
   panel.dataset.ticker = ticker;
-  const badgeClass = d.signal.label === 'BUY' ? 'badge-buy' : d.signal.label === 'SELL' ? 'badge-sell' : 'badge-hold';
-  const log = d.log || [];
+
+  // Signal row: real badge + reason once /api/history resolves, loading text until then.
+  const signalHtml = d.signal
+    ? `<span class="signal-badge ${d.signal.label === 'BUY' ? 'badge-buy' : d.signal.label === 'SELL' ? 'badge-sell' : 'badge-hold'}">${esc(d.signal.label)}</span>
+       <span class="signal-reason">${esc(d.signal.reason)}</span>`
+    : `<span class="signal-badge badge-loading">…</span>
+       <span class="signal-reason">Computing signal from price history…</span>`;
 
   panel.innerHTML = `
     <div class="detail-panel">
       <div class="detail-header">
-        <div class="detail-title">${esc(ticker)} — ${esc(d.name)}</div>
+        <div class="detail-title">${esc(ticker)}</div>
         <button class="close-btn" data-action="close-detail">✕ Close</button>
       </div>
       <div class="metrics-row">
-        <div class="metric"><div class="metric-label">Price</div><div class="metric-value">$${fmtNum(d.price)}</div></div>
-        <div class="metric"><div class="metric-label">52w high</div><div class="metric-value">$${fmtNum(d.high52)}</div></div>
-        <div class="metric"><div class="metric-label">52w low</div><div class="metric-value">$${fmtNum(d.low52)}</div></div>
+        <div class="metric"><div class="metric-label">Price</div><div class="metric-value">${fmtMoney(d.price)}</div></div>
+        <div class="metric"><div class="metric-label">52w high</div><div class="metric-value">${fmtMoney(d.high52)}</div></div>
+        <div class="metric"><div class="metric-label">52w low</div><div class="metric-value">${fmtMoney(d.low52)}</div></div>
         <div class="metric"><div class="metric-label">Volume</div><div class="metric-value">${fmtVol(d.volume)}</div></div>
       </div>
       <div class="signal-row">
-        <span class="signal-badge ${badgeClass}">${d.signal.label}</span>
-        <span class="signal-reason">${esc(d.signal.reason)}</span>
+        ${signalHtml}
       </div>
       <div class="section-label">Technical indicators</div>
       <div class="metrics-row">
@@ -458,7 +408,7 @@ function showDetail(ticker) {
       </div>
       <div class="section-label" style="margin-top:1rem;">Signal history</div>
       <div class="signal-log">
-        ${log.map(l => { const c = l.signal === 'BUY' ? '#2d9e6b' : l.signal === 'SELL' ? '#d94040' : '#aaa'; return `<div class="log-item"><span class="log-dot" style="background:${c};"></span><span class="log-date">${esc(l.date)}</span><span class="log-desc">${esc(l.signal)} — ${esc(l.note)}</span></div>`; }).join('')}
+        <div style="font-size:12px;color:#888;">Not tracked yet — signal-change logging is planned for a later phase.</div>
       </div>
     </div>`;
   panel.style.display = 'block';
@@ -471,17 +421,7 @@ function addTicker() {
   const val = sanitizeTicker(input.value);
   if (!val || watchlist.includes(val)) { input.value = ''; return; }
 
-  if (!STOCKS[val]) {
-    const p = 150 + Math.random() * 200;
-    STOCKS[val] = {
-      name: val, price: p, change: (Math.random() - 0.5) * 5, changePct: (Math.random() - 0.5) * 2,
-      high52: p * 1.2, low52: p * 0.75, volume: Math.floor(Math.random() * 50e6), marketCap: Math.random() * 1e12,
-      signal: { label: ['BUY', 'HOLD', 'SELL'][Math.floor(Math.random() * 3)], reason: 'Simulated — real signal logic not yet wired in.' },
-      prevSignal: 'HOLD',
-      congress: [],
-      log: [],
-    };
-  }
+  if (!STOCKS[val]) STOCKS[val] = makeStock();
   watchlist.push(val); saveWatchlist();
   input.value = '';
   renderCard(val); checkEmpty();
@@ -521,12 +461,15 @@ document.getElementById('detail-panel').addEventListener('click', e => {
 });
 
 // ---------- Init ----------
-watchlist.forEach(t => { if (STOCKS[t]) renderCard(t); });
-checkEmpty();
-// Fetch real prices and real MA-based signals for every ticker.
-// Cards show mock data until each request resolves.
+// Every ticker persisted in the watchlist gets a placeholder entry and a card
+// (previously only hardcoded tickers rendered, so user-added ones silently
+// vanished on reload). Cards show a loading state until each fetch resolves.
 watchlist.forEach(t => {
-  if (!STOCKS[t]) return;
+  STOCKS[t] = makeStock();
+  renderCard(t);
+});
+checkEmpty();
+watchlist.forEach(t => {
   refreshLiveQuote(t); // live price/change from Finnhub
   refreshSignal(t);    // MA-based signal + real sparkline from Twelve Data
   refreshCongress(t);  // real House congressional trades from the House Clerk feed

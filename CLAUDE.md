@@ -27,8 +27,8 @@ Browser (index.html, GitHub Pages)
 - Three data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache); the **U.S. House Clerk** disclosure feed supplies congressional trades (`GET /api/congress/:ticker`, 12h cache, no API key). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
 - `/api/history` computes MA20/MA50/MA200, a BUY/HOLD/SELL signal with reason text, RSI(14), MACD(12/26/9), 52w high/low, and volume server-side, plus a 30-day sparkline of real closes.
 - `/api/congress` downloads the House Clerk's yearly disclosure ZIP, parses each recent PTR PDF (via `pdf-parse`), and buckets stock trades by ticker. House only; ~90% of PTRs are machine-readable (the rest are scanned and skipped); only trades with a clean `(TICKER) [ST]` tag are kept.
-- Frontend (`index.html`) fetches all three endpoints per ticker. `BACKEND_URL` constant points at the Render service.
-- Still mock: signal history log. (Market cap was removed rather than mocked.)
+- Frontend (`index.html`) fetches all three endpoints per ticker. `BACKEND_URL` constant points at the Render service. Cards start as loading placeholders (no mock data anywhere); persisted watchlist tickers hydrate on reload; invalid tickers show an error state.
+- Nothing is mock anymore. The last mock piece (signal history log) was removed rather than simulated — the UI section says "not tracked yet". (Market cap was removed earlier for the same reason.)
 - Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
 
 ## Keys
@@ -95,5 +95,5 @@ Frontend: just open `index.html` in a browser. No build, no server needed for th
 
 - Finnhub free tier is rate-limited (~60 calls/min). The 60-second cache in `server.js` is there to respect this — keep it.
 - Finnhub returns `{ c: 0, pc: 0 }` for invalid tickers rather than an error; the backend already special-cases this.
-- Render's free tier sleeps after inactivity (~30s cold start on first request). The frontend should show a loading state once wired up.
+- Render's free tier sleeps after inactivity (~30s cold start on first request). The frontend shows loading states on every card until data arrives — keep that behavior.
 - Node version in use: v20.x. Don't rely on features newer than that without checking.
