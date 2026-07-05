@@ -560,7 +560,7 @@ function renderNews(d) {
       <div class="news-meta">${esc(a.source || 'Unknown source')} · ${esc(a.date)}</div>
     </div>`;
   }).join('');
-  return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: Finnhub company news · last 7 days · sentiment not scored yet.</div>';
+  return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: Finnhub company news · last 7 days · headlines shown unscored, by design — read and judge for yourself.</div>';
 }
 
 function showDetail(ticker) {
