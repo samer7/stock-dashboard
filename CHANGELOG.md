@@ -4,6 +4,16 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.7] - 2026-07-05
+### Added
+- **Momentum research digest** (`docs/research/momentum.md`, 13 verified citations): cross-sectional momentum is real and pervasive but heavily caveated (short-side profits, turnover costs, momentum crashes, ~58% post-publication decay); realistic long-only large-cap edge ~1–3%/yr. Proposes the next harness test: **12-2 relative momentum, top-3, monthly** vs equal-weighted basket buy-and-hold — needs a portfolio-mode harness extension that doubles as Phase 6's simulator core. NOT yet run
+- **Congressional-trading research digest** (`docs/research/congressional-trading.md`, 7 verified citations): the pre-2012 "Congress beats the market" result did not survive re-analysis (Eggers & Hainmueller 2013); post-STOCK-Act studies unanimously find no edge (House buys −26 bps at 6 months, Belmont et al. 2022); copy-congress ETFs (NANC/KRUZ) ≈ SPY before fees. Phase 5e reshaped as a transparency + honest-measurement feature with pre-committed method, ≥20-trade minimums, matched-random baselines, and a best-of-N null for the leaderboard
+
+### Notes
+- Docs-only release: both digests drafted by parallel research agents, citations verified via web search, reviewed and linked from `docs/research/README.md`
+
+---
+
 ## [0.9.6] - 2026-07-05
 ### Added
 - **12-month TSMOM strategy** (`tsmomSignalSeries` in `strategies.js`, `--strategy=tsmom`): long/cash time-series momentum — at month-end, in if the trailing 12-month return is positive, else cash. Completes the digest's three-variant test set; strategy selection in `analyze.js` is now a proper map (`ma`/`faber`/`tsmom`)

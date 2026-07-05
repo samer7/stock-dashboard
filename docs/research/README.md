@@ -89,8 +89,35 @@ Queued topics (in order):
   pattern — fully consistent with the flip-level finding above.
 - **Momentum** — the most robust return anomaly in the academic literature
   (Jegadeesh & Titman 1993 and hundreds of follow-ups).
+  **Digest: [momentum.md](momentum.md)** (2026-07-05, 13 verified citations):
+  cross-sectional momentum (ranking stocks against each other — distinct from
+  the time-series variant the harness already rejected) is real and pervasive,
+  but the caveats stack: half the profit is on the short side, turnover costs
+  eat much of the rest, it crashes in market rebounds, and it decays ~58%
+  post-publication. Realistic long-only after-cost edge on large caps: ~1–3%/yr
+  of relative edge, and momentum spreads are smallest among mega-caps — exactly
+  our basket. **Proposed harness test (not yet run): 12-2 relative momentum,
+  top-3, monthly** — rank the 18-ticker basket by `close[t−21d]/close[t−252d] − 1`
+  at month-end, hold the top 3 equal-weighted, benchmark vs equal-weighted
+  buy-and-hold of the same basket, with next-day execution, costs, and
+  `--adjust`. Needs a small portfolio-mode harness extension (which doubles as
+  Phase 6's simulator core). Literature's prediction: within a few points of
+  the basket either side, ~52–55% monthly hit rate — likely indistinguishable
+  from coin-flip on ~230 months.
 - **Congressional trading** — Ziobrowski et al. (2004, 2011) found large excess
   returns pre-STOCK Act; post-2012 studies find the edge much smaller or gone.
+  **Digest: [congressional-trading.md](congressional-trading.md)** (2026-07-05,
+  7 verified citations): the pre-2012 "Congress beats the market" result did
+  not survive re-analysis (Eggers & Hainmueller 2013 found members *lag* index
+  funds), post-STOCK-Act studies unanimously find no edge (House buys
+  underperform ~26 bps at 6 months, Belmont et al. 2022), and the live
+  copy-congress ETFs (NANC/KRUZ) have roughly tracked SPY before fees. Honest
+  prior for Phase 5e: per-member records will mostly measure luck — build it
+  as a transparency + honest-measurement feature with pre-committed method,
+  ≥20-trade minimums, matched-random-trade baselines, and a best-of-N null
+  for the leaderboard (with hundreds of filers, someone always looks brilliant
+  by chance).
 
-Digests so far: [ma-timing.md](ma-timing.md). Other entries land here as the
-topics are researched.
+Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
+[congressional-trading.md](congressional-trading.md). Other entries land here
+as the topics are researched.
