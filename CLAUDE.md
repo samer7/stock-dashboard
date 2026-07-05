@@ -23,7 +23,7 @@ Browser (index.html, GitHub Pages)
        → fetch (with secret key) → Finnhub API
 ```
 
-## Current state (Phase 4 in progress)
+## Current state (Phase 5 in progress — evaluation harness live, UI reframe next)
 
 - Backend deployed to Render at `https://samer7-stock-api.onrender.com` (free tier). `npm start` in `/server` also runs it locally on port 3000.
 - Three data sources: **Finnhub** supplies live quotes (`GET /api/quote/:ticker`, 60s cache) and company news (`GET /api/news/:ticker`, 7-day window, 30m cache, newest 8 deduped headlines — no sentiment yet, deliberately); **Twelve Data** supplies historical daily closes (`GET /api/history/:ticker`, 6h cache); the **U.S. House Clerk** disclosure feed supplies congressional trades (`GET /api/congress/:ticker`, 12h cache, no API key). Finnhub's free tier blocks historical candles, which is why Twelve Data was added.
@@ -32,6 +32,8 @@ Browser (index.html, GitHub Pages)
 - `GET /api/congress/recent` serves the cross-ticker feed (newest 100 trades from the same index, future-dated filer typos filtered). The route is registered BEFORE `/api/congress/:ticker` so the literal path wins. The frontend groups feed rows by member + day so one filer's bulk rebalance doesn't flood the list.
 - Frontend (`index.html`) fetches all four endpoints per ticker (quote, history, congress, news). `BACKEND_URL` constant points at the Render service. Cards start as loading placeholders (no mock data anywhere); persisted watchlist tickers hydrate on reload; invalid tickers show an error state.
 - Nothing is mock anymore. The last mock piece (signal history log) was removed rather than simulated — the UI section says "not tracked yet". (Market cap was removed earlier for the same reason.)
+- The Phase 5a **evaluation harness** (`server/harness/`, v0.9.0–0.9.2) is built and battle-tested: deterministic backtest CLI + 18-ticker sweep, with `--adjust` (total-return prices) and `--cost` robustness flags. **Its finding is the project's first measured result: the dashboard's MA signal does NOT beat buy-and-hold (1/18 price-only; 0/6 with dividends) and its timing carries no information (pooled BUY hit rates = base rates); its only virtue is shallower drawdowns (16/18).** Details in `docs/research/README.md`.
+- **Next planned task: reframe the UI signal legend** to carry that measured result ("historically reduced drawdowns, did not beat buy-and-hold") instead of implying BUY/SELL are trade advice. After that: signal-transition (event-based) analysis, the formal MA research digest with citations, then 5b–5e.
 - Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
 
 ## Keys
