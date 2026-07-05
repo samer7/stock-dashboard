@@ -38,7 +38,8 @@ Browser (index.html, GitHub Pages)
 - The first formal research digest is written: `docs/research/ma-timing.md` (12 verified citations incl. the Park & Irwin 2007 survey; the literature corroborates the harness verdict point for point — no return edge after costs post-1990, drawdown dampening is the robust residual).
 - All three of the digest's falsifiable follow-ups are tested (v0.9.5–0.9.6): the **crisis-window test** confirms the drawdown claim decisively (daily rule beats buy-and-hold in 49/54 crisis ticker-windows, e.g. median −9.5% vs −50.5% in the financial crisis); **Faber's 10-month SMA** and **12-month TSMOM** (`--strategy=faber|tsmom`) behave exactly as the literature predicts (0/6 total-return CAGR each, drawdown benefit kept on far fewer trades). Cross-variant finding: crisis protection scales with reaction speed (COVID wins 17/18 daily vs 13/18 Faber vs 11/18 TSMOM). **The MA topic is closed.**
 - The momentum and congressional digests are written (v0.9.7, `docs/research/momentum.md` + `congressional-trading.md`): cross-sectional momentum is real but the realistic long-only large-cap edge is only ~1–3%/yr; post-STOCK-Act congressional trades carry no copyable edge (5e is therefore a transparency + honest-measurement feature with hard statistical guardrails, not a tip engine).
-- **Next planned task: implement and run the momentum digest's proposed rule** — 12-2 relative momentum, top-3, monthly, vs equal-weighted basket buy-and-hold (spec in `momentum.md` §5). Requires a portfolio-mode harness extension (holds several tickers at once — deliberately the same simulator core Phase 6 needs). After that: walk-forward machinery, 5b–5e.
+- The **portfolio-mode simulator** (`server/harness/portfolio.js`) and the momentum experiment (`momentum.js`) are built and run (v0.9.8). **Verdict: the digest's 12-2 top-3 monthly rule adds nothing over holding the basket** — +0.6pp CAGR (noise) but worse Sharpe/drawdown and a 48.0% monthly hit rate on 227 months; the 12-1 ablation beating 12-2 was investigated (not a bug — NVDA-surge months on a survivor-selected basket). No relative-strength rank ships; full verdict in `momentum.md` §7. The portfolio simulator is deliberately the engine Phase 6 will run forward.
+- **Next planned tasks:** the RSI/MACD research digest (drafted in parallel, 2026-07-05 — the dashboard displays both indicators untested), then walk-forward machinery and 5b–5e.
 - Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
 
 ## Keys
@@ -66,7 +67,7 @@ When working on Phase 5/6, keep the owner-is-learning ethos: explain the math, p
 | `server/package.json` | Node dependencies (express, cors, dotenv, adm-zip, pdf-parse). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |
-| `server/harness/` | Phase 5a backtesting harness (standalone CLI, not served by Express): `data.js` (history fetch + disk cache), `strategies.js` (signal rules — the MA rule MUST stay in sync with computeSignal in server.js), `backtest.js` (simulator, baselines, horizons), `metrics.js`, `run.js` (CLI). Deterministic by design: frozen cache + seeded randomness. |
+| `server/harness/` | Phase 5a backtesting harness (standalone CLI, not served by Express): `data.js` (history fetch + disk cache + throttled loader), `strategies.js` (single-ticker signal rules — the MA rule MUST stay in sync with computeSignal in server.js), `backtest.js` (single-ticker simulator, baselines, horizons), `portfolio.js` (multi-ticker simulator core — alignment, rebalance-to-weights with costs on traded volume, EW benchmarks, random-picks baseline; Phase 6 reuses this engine), `momentum.js` (the 12-2 top-3 monthly experiment), `metrics.js`, `run.js` (CLI). Deterministic by design: frozen cache + seeded randomness. |
 | `docs/research/` | Research-digest workstream: per-topic summaries of published quant-finance literature with citations, tied to harness results. |
 | `README.md` | Human-facing project overview and roadmap. |
 | `CHANGELOG.md` | Version history. |
@@ -96,6 +97,9 @@ node run.js AAPL --refresh    # refetch history
 node sweep.js                 # 18-ticker default basket, scoreboard + pooled hit rates
 node sweep.js AAPL MSFT KO    # custom basket
 # flags for both: --adjust (total-return prices), --cost=0.002, --refresh (run.js only)
+node momentum.js              # portfolio mode: 12-2 relative momentum, top-3, monthly,
+                              # vs equal-weight basket (--adjust, --cost=, --skip=0 for
+                              # the 12-1 ablation, --top=)
 ```
 
 Frontend: just open `index.html` in a browser. No build, no server needed for the frontend itself.

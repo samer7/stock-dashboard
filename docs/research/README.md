@@ -96,14 +96,20 @@ Queued topics (in order):
   eat much of the rest, it crashes in market rebounds, and it decays ~58%
   post-publication. Realistic long-only after-cost edge on large caps: ~1–3%/yr
   of relative edge, and momentum spreads are smallest among mega-caps — exactly
-  our basket. **Proposed harness test (not yet run): 12-2 relative momentum,
-  top-3, monthly** — rank the 18-ticker basket by `close[t−21d]/close[t−252d] − 1`
-  at month-end, hold the top 3 equal-weighted, benchmark vs equal-weighted
-  buy-and-hold of the same basket, with next-day execution, costs, and
-  `--adjust`. Needs a small portfolio-mode harness extension (which doubles as
-  Phase 6's simulator core). Literature's prediction: within a few points of
-  the basket either side, ~52–55% monthly hit rate — likely indistinguishable
-  from coin-flip on ~230 months.
+  our basket. **Harness verdict (2026-07-05, `node momentum.js`, on the new
+  portfolio-mode simulator):** the digest's proposed rule — 12-2 relative
+  momentum, top-3, monthly — was run over 227 months (2007–2026) and landed
+  almost exactly on the literature's prediction. Total-return, after costs:
+  20.0% CAGR vs the equal-weight basket's 19.4% (+0.6pp — noise), but a WORSE
+  Sharpe (0.80 vs 0.87), worse max drawdown (−60% vs −52%), and a monthly hit
+  rate of 48.0% — a coin. Price-only it lost outright. The 12-1 ablation came
+  out *better* than 12-2 (the opposite of Jegadeesh 1990) — investigated, not
+  a bug: 85% of picks are shared and the gap is a handful of NVDA-surge months,
+  i.e. the 18-name noise problem demonstrated from inside. It lagged the 2009
+  rebound as real momentum should, but not 2020's (tech led that one — basket
+  artifact), and lost more than the basket in every crisis window (no cash
+  exit). Pre-committed criterion (beat on CAGR *and* Sharpe): **not met — no
+  relative-strength rank ships.** Full verdict in [momentum.md](momentum.md) §7.
 - **Congressional trading** — Ziobrowski et al. (2004, 2011) found large excess
   returns pre-STOCK Act; post-2012 studies find the edge much smaller or gone.
   **Digest: [congressional-trading.md](congressional-trading.md)** (2026-07-05,

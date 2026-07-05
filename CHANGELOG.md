@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.8] - 2026-07-05
+### Added
+- **Portfolio-mode simulator core** (`server/harness/portfolio.js`): multi-ticker date alignment, dollar-position simulation with rebalance-to-target-weights, costs charged per traded dollar (generalizes the single-ticker per-switch model), equal-weight buy-and-hold + equal-weight rebalanced benchmarks, and a seeded random-picks baseline. Deliberately the same engine Phase 6's paper trading will run forward
+- **Momentum experiment runner** (`server/harness/momentum.js`): the momentum digest's §5 rule — 12-2 relative momentum, top-3, monthly, vs equal-weighted basket buy-and-hold — with `--adjust`, `--cost=`, `--top=`, and `--skip=0` (the 12-1 ablation), plus rebound-window and crisis-window checks
+
+### Measured
+- **The momentum verdict (momentum.md §7): the specced rule adds nothing over holding the basket — no relative-strength rank ships.** Total-return after costs: 20.0% CAGR vs 19.4% equal-weight buy-and-hold (+0.6pp, noise), worse Sharpe (0.80 vs 0.87), worse drawdown (−60% vs −52%), 48.0% monthly hit rate on 227 months (coin-flip band ±6.6pp); loses outright on price-only data. The 12-1 ablation beat 12-2 (opposite of Jegadeesh 1990) — verified by hand not to be a bug: 85% shared picks, gap driven by a few NVDA-surge months, i.e. the digest's 18-name-noise warning demonstrated from inside
+
+### Changed
+- `crisisStats` accepts custom windows (reused for the momentum rebound test); `mulberry32` exported from backtest.js; the rate-limit-throttled history loader moved from sweep.js into data.js (`loadWithThrottle`, `isCached`) so all runners share it
+
+---
+
 ## [0.9.7] - 2026-07-05
 ### Added
 - **Momentum research digest** (`docs/research/momentum.md`, 13 verified citations): cross-sectional momentum is real and pervasive but heavily caveated (short-side profits, turnover costs, momentum crashes, ~58% post-publication decay); realistic long-only large-cap edge ~1–3%/yr. Proposes the next harness test: **12-2 relative momentum, top-3, monthly** vs equal-weighted basket buy-and-hold — needs a portfolio-mode harness extension that doubles as Phase 6's simulator core. NOT yet run

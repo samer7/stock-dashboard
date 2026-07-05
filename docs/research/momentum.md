@@ -148,6 +148,65 @@ before believing it.
    basket, the 18-ticker noise problem is confirmed — and the result shouldn't drive UI
    features either way.
 
+## 7. Harness verdict (2026-07-05, v0.9.8)
+
+The rule from §5 was implemented (`server/harness/momentum.js`, on the new portfolio-mode
+simulator in `portfolio.js`) and run over the default 18-ticker basket, aligned
+2007-08-31 → 2026-07-02 (18.8 years, 227 monthly decisions). Headline numbers are the
+total-return (`--adjust`) run at 0.1% cost per traded dollar:
+
+| portfolio | CAGR | Sharpe | maxDD | monthly hit rate vs B&H |
+| --- | --- | --- | --- | --- |
+| momentum top-3 (12-2) | 20.0% | 0.80 | −60% | 109/227 = **48.0%** |
+| EW buy-and-hold (the §5 benchmark) | 19.4% | **0.87** | −52% | — |
+| EW monthly-rebalanced | 15.7% | 0.83 | −50% | — |
+
+**Check #1 — FAILED (pre-committed criterion not met).** Top-3 edged buy-and-hold on CAGR
+(+0.6pp — well inside the "few points are noise" band) but lost on Sharpe (0.80 vs 0.87)
+and on drawdown (−60% vs −52%), and its monthly hit rate sat *below* 50% (48.0%; coin-flip
+noise on 227 months is ±6.6pp). On price-only data it lost on every measure (17.9% vs
+18.6% CAGR, 44.1% hit rate); at doubled cost, 17.2%. Turnover ran ~650%/yr one-way
+(~0.65%/yr of cost drag at 0.1%). This is §5's "honest prediction" almost verbatim:
+within a few points either side, worse drawdown, hit rate indistinguishable from a coin.
+**Momentum does not enter Phase 5c scoring on this evidence.**
+
+**Check #2 — FAILED, investigated, not a bug.** 12-1 beat 12-2 in every configuration
+(total-return: 21.7% vs 20.0% CAGR), the opposite of Jegadeesh (1990). Diagnosis: the
+computation was verified by hand at three month-ends (2008-12 correctly ranks defensives
+on top; 2020-03 correctly skips the crash month; 2023-05 shows NVDA at +101% on 12-1 vs
++54% on 12-2 because the skipped month WAS the earnings explosion). The two variants share
+85% of picks and both hold NVDA about half of all months (115 vs 120 of 227); the gap
+comes from a handful of differing picks landing in mega-cap surge months that kept running
+instead of reversing. On 18 survivor-selected names, the skip-month refinement is simply
+inside the noise — which is §4's warning ("close to the worst place to measure it")
+demonstrated, and it means check #4's basket-dependence concern is confirmed without
+needing a second basket.
+
+**Check #3 — half-passed.** 2009 recovery: momentum lagged as it should (+75% vs the
+basket's +88%). 2020 recovery: it did NOT lag (+103% vs +85%) — but the top-3 coming out
+of the COVID crash was all mega-cap tech, and tech *led* that particular rebound. A
+Daniel–Moskowitz crash needs beaten-down losers to rocket back; on a basket where the
+"losers" are T, F, and PFE, that rotation barely exists. Basket artifact, noted as such.
+
+**Crisis windows** behaved as predicted for a no-cash-exit relative bet: momentum lost
+*more* than the basket in all three covered declines (financial crisis −57% vs −50%,
+COVID −30% vs −28%, 2022 −37% vs −35%). Whatever this rule is, it is not protection.
+
+Two honest curiosities, recorded so nobody later mistakes them for edges. First, momentum
+beat 98% of 1,000 seeded random top-3 portfolios (same months, same universe, same
+costs) — but the median random top-3 finished at $94k vs buy-and-hold's $278k: any
+3-name portfolio that fails to *hold the winners* badly lags this basket, so "beats
+random picks" mostly restates that the basket's past winners kept winning — the
+survivor-selection flatterer of §4, not transferable skill. Second, momentum beat the
+*monthly-rebalanced* equal-weight by +4.3pp CAGR — that is a statement about rebalancing
+(resetting winners to 1/18 every month is costly when one of them is NVDA), not about
+the 12-2 signal.
+
+**Bottom line: the topic stays open in the literature, but for THIS dashboard the specced
+rule adds nothing over holding the basket — no relative-strength rank ships.** A different
+verdict would need the thing the literature actually describes: hundreds of names, which a
+free-tier 18-ticker watchlist cannot honestly test.
+
 ## References
 
 - Jegadeesh, N. (1990). "Evidence of Predictable Behavior of Security Returns." *Journal of Finance* 45(3), 881–898.

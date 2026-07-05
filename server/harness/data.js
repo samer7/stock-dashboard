@@ -65,4 +65,32 @@ function stalenessWarning(history) {
   return `⚠ ${history.ticker} data is ${Math.round(ageDays)} days old — pass --refresh to refetch`;
 }
 
-module.exports = { loadDailyHistory, stalenessWarning };
+// loadDailyHistory with Twelve Data's free-tier rate limit (8 calls/minute)
+// handled: if the API says we're over budget, wait a minute and retry rather
+// than dying halfway through a multi-ticker run. Cached tickers never hit
+// the network, so this only matters for first fetches. Used by sweep.js and
+// the portfolio-mode runners.
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function loadWithThrottle(ticker, adjusted) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await loadDailyHistory(ticker, { adjusted });
+    } catch (err) {
+      if (/credit|limit|frequen/i.test(err.message) && attempt < 3) {
+        process.stderr.write(`  ${ticker}: rate limited, waiting 60s (attempt ${attempt}/3)...\n`);
+        await sleep(60_000);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+// Is this ticker already on disk? Callers use it to decide whether the next
+// fetch needs spacing (fresh API calls must stay under 8/minute).
+function isCached(ticker, adjusted) {
+  return fs.existsSync(path.join(CACHE_DIR, `${ticker}${adjusted ? '.adj' : ''}.json`));
+}
+
+module.exports = { loadDailyHistory, loadWithThrottle, isCached, stalenessWarning };

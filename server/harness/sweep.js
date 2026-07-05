@@ -15,7 +15,7 @@
 // (the worst histories of all) can't be included. Even this basket is
 // survivor-tilted; the report says so.
 
-const { loadDailyHistory, stalenessWarning } = require('./data');
+const { loadWithThrottle, isCached, stalenessWarning } = require('./data');
 const { analyze } = require('./analyze');
 const { HORIZONS, CRISIS_WINDOWS } = require('./backtest');
 
@@ -29,25 +29,10 @@ const DEFAULT_BASKET = [
 ];
 
 // Twelve Data free tier allows 8 API calls/minute. Cached tickers cost
-// nothing; uncached ones are spaced out, and if we still hit the limit we
-// wait a minute and retry rather than dying halfway through a sweep.
+// nothing; uncached ones are spaced out (loadWithThrottle in data.js also
+// waits and retries if we still hit the limit).
 const FETCH_SPACING_MS = 8500;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function loadWithThrottle(ticker, adjusted) {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      return await loadDailyHistory(ticker, { adjusted });
-    } catch (err) {
-      if (/credit|limit|frequen/i.test(err.message) && attempt < 3) {
-        process.stderr.write(`  ${ticker}: rate limited, waiting 60s (attempt ${attempt}/3)...\n`);
-        await sleep(60_000);
-      } else {
-        throw err;
-      }
-    }
-  }
-}
 
 const pct = (x, d = 1) => (x === null ? 'n/a' : (x * 100).toFixed(d) + '%');
 
@@ -68,11 +53,9 @@ async function main() {
   const results = [];
   const failed = [];
   const warnings = [];
-  const fs = require('fs');
-  const path = require('path');
 
   for (const ticker of basket) {
-    const cached = fs.existsSync(path.join(__dirname, 'cache', `${ticker}${adjusted ? '.adj' : ''}.json`));
+    const cached = isCached(ticker, adjusted);
     try {
       const history = await loadWithThrottle(ticker, adjusted);
       const stale = stalenessWarning(history);

@@ -255,8 +255,11 @@ const CRISIS_WINDOWS = [
 
 // dates: 'YYYY-MM-DD' per day; stratValues/benchValues: daily portfolio worth
 // from the same simulation the headline numbers come from (no re-warmup).
-function crisisStats(dates, stratValues, benchValues) {
-  return CRISIS_WINDOWS.map((w) => {
+// `windows` defaults to the crisis calendar above, but callers can pass any
+// list of {label, from, to} — the momentum test reuses this for REBOUND
+// windows (where momentum is predicted to LAG, not protect).
+function crisisStats(dates, stratValues, benchValues, windows = CRISIS_WINDOWS) {
+  return windows.map((w) => {
     let i0 = -1, i1 = -1;
     for (let i = 0; i < dates.length; i++) {
       if (i0 === -1 && dates[i] >= w.from) i0 = i;
@@ -291,4 +294,4 @@ function mulberry32(seed) {
   };
 }
 
-module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats, HORIZONS, CRISIS_WINDOWS };
+module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats, mulberry32, HORIZONS, CRISIS_WINDOWS };
