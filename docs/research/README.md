@@ -29,6 +29,13 @@ Queued topics (in order):
   risk-dampener, not a return generator — consistent with the post-1990s
   academic consensus on MA rules after costs. (Formal digest with citations
   still to be written.)
+  **Robustness checks (same date):** with dividends reinvested (`--adjust`,
+  total-return prices) the verdict *strengthens* — 0/6 on both CAGR and Sharpe
+  across the dividend-heavy names (T/KO/PG/JNJ/XOM/SPY); price-only data had
+  been understating buy-and-hold (e.g. T: -2.1% price-only vs +3.5% total
+  return). And the result is insensitive to the cost assumption: AAPL strategy
+  CAGR is 14.5%/13.3%/12.2% at 0/0.1%/0.2% per-switch cost vs 25.1% buy-and-hold
+  in all cases.
 - **Momentum** — the most robust return anomaly in the academic literature
   (Jegadeesh & Titman 1993 and hundreds of follow-ups).
 - **Congressional trading** — Ziobrowski et al. (2004, 2011) found large excess

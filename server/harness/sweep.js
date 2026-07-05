@@ -15,11 +15,9 @@
 // (the worst histories of all) can't be included. Even this basket is
 // survivor-tilted; the report says so.
 
-const { loadDailyHistory } = require('./data');
+const { loadDailyHistory, stalenessWarning } = require('./data');
 const { analyze } = require('./analyze');
 const { HORIZONS } = require('./backtest');
-
-const COST_RATE = 0.001;
 
 // The default basket: 3 index ETFs, 5 mega-winners, 5 steady/defensive
 // names, 5 strugglers/cyclicals. ~18 API credits on first run (cached after).
@@ -36,10 +34,10 @@ const DEFAULT_BASKET = [
 const FETCH_SPACING_MS = 8500;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function loadWithThrottle(ticker, isFirstFetch) {
+async function loadWithThrottle(ticker, adjusted) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return await loadDailyHistory(ticker);
+      return await loadDailyHistory(ticker, { adjusted });
     } catch (err) {
       if (/credit|limit|frequen/i.test(err.message) && attempt < 3) {
         process.stderr.write(`  ${ticker}: rate limited, waiting 60s (attempt ${attempt}/3)...\n`);
@@ -54,19 +52,26 @@ async function loadWithThrottle(ticker, isFirstFetch) {
 const pct = (x, d = 1) => (x === null ? 'n/a' : (x * 100).toFixed(d) + '%');
 
 async function main() {
-  const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
+  const rawArgs = process.argv.slice(2);
+  const adjusted = rawArgs.includes('--adjust');
+  const costArg = rawArgs.find(a => a.startsWith('--cost='));
+  const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
+  const args = rawArgs.filter(a => !a.startsWith('--'));
   const basket = args.length ? args.map(t => t.toUpperCase()) : DEFAULT_BASKET;
 
   const results = [];
   const failed = [];
+  const warnings = [];
   const fs = require('fs');
   const path = require('path');
 
   for (const ticker of basket) {
-    const cached = fs.existsSync(path.join(__dirname, 'cache', `${ticker}.json`));
+    const cached = fs.existsSync(path.join(__dirname, 'cache', `${ticker}${adjusted ? '.adj' : ''}.json`));
     try {
-      const history = await loadWithThrottle(ticker);
-      const a = analyze(history, { costRate: COST_RATE });
+      const history = await loadWithThrottle(ticker, adjusted);
+      const stale = stalenessWarning(history);
+      if (stale) warnings.push(stale);
+      const a = analyze(history, { costRate });
       if (!a) { failed.push({ ticker, reason: `only ${history.days.length} days of history` }); continue; }
       results.push(a);
       process.stderr.write(`  ${ticker} done (${a.years.toFixed(1)}y${cached ? ', cached' : ''})\n`);
@@ -84,7 +89,8 @@ async function main() {
 
   // ---------- Per-ticker table ----------
   console.log(`\n=== Sweep: dashboard MA signal across ${results.length} tickers ===`);
-  console.log(`Rule: BUY > MA20/50/200, SELL < MA20/50, next-day execution, ${pct(COST_RATE, 2)} cost/switch\n`);
+  console.log(`Rule: BUY > MA20/50/200, SELL < MA20/50, next-day execution, ${pct(costRate, 2)} cost/switch`);
+  console.log(`Prices: ${adjusted ? "TOTAL RETURN (dividends reinvested)" : "split-adjusted only — dividends excluded (--adjust for total return)"}\n`);
   console.log(
     `  ${'ticker'.padEnd(7)}${'years'.padStart(6)}` +
     `${'strat CAGR'.padStart(12)}${'b&h CAGR'.padStart(10)}` +
@@ -141,11 +147,20 @@ async function main() {
   if (failed.length) {
     console.log(`\n  Skipped: ${failed.map(f => `${f.ticker} (${f.reason})`).join('; ')}`);
   }
+  if (warnings.length) {
+    console.log(`\n  ${warnings.join('\n  ')}`);
+  }
 
   console.log(`\n  Caveats:`);
   console.log(`  - Only currently-listed symbols can be fetched — bankrupt/delisted histories are missing,`);
   console.log(`    so even this deliberately-mixed basket is survivor-tilted.`);
-  console.log(`  - Dividends excluded (understates buy-and-hold most, especially for KO/PG/JNJ/T/XOM).`);
+  if (adjusted) {
+    console.log(`  - Total-return prices: signals computed on dividend-adjusted closes can differ slightly`);
+    console.log(`    from the live dashboard's (which sees split-adjusted prices only).`);
+  } else {
+    console.log(`  - Dividends excluded (understates buy-and-hold most, especially KO/PG/JNJ/T/XOM) —`);
+    console.log(`    re-run with --adjust for total-return numbers.`);
+  }
   console.log(`  - Cash earns 0%; overlapping horizon windows overstate confidence; see run.js report for detail.`);
 }
 

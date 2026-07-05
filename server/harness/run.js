@@ -12,10 +12,8 @@
 // All computation lives in analyze.js (shared with sweep.js); this file only
 // loads data and formats the report.
 
-const { loadDailyHistory } = require('./data');
+const { loadDailyHistory, stalenessWarning } = require('./data');
 const { analyze } = require('./analyze');
-
-const COST_RATE = 0.001; // 0.1% of the portfolio per switch (commission + slippage)
 
 const pct = (x, digits = 1) => (x === null ? '  n/a' : (x * 100).toFixed(digits) + '%');
 
@@ -23,13 +21,19 @@ async function main() {
   const args = process.argv.slice(2);
   const ticker = (args.find(a => !a.startsWith('--')) || '').toUpperCase();
   const refresh = args.includes('--refresh');
-  if (!ticker) {
-    console.error('Usage: node run.js TICKER [--refresh]');
+  // --adjust: use total-return closes (dividends reinvested) — the honest
+  // basis for return comparisons, especially on dividend payers like T or KO.
+  const adjusted = args.includes('--adjust');
+  // --cost=0.002: sensitivity check on the per-switch cost assumption.
+  const costArg = args.find(a => a.startsWith('--cost='));
+  const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
+  if (!ticker || Number.isNaN(costRate)) {
+    console.error('Usage: node run.js TICKER [--refresh] [--adjust] [--cost=0.001]');
     process.exit(1);
   }
 
-  const history = await loadDailyHistory(ticker, { refresh });
-  const a = analyze(history, { costRate: COST_RATE });
+  const history = await loadDailyHistory(ticker, { refresh, adjusted });
+  const a = analyze(history, { costRate });
   if (!a) {
     console.error(`${ticker}: only ${history.days.length} days of history — need 200+ for the MA200 signal.`);
     process.exit(1);
@@ -38,7 +42,10 @@ async function main() {
   // ---------- Report ----------
   console.log(`\n=== Backtest: dashboard MA signal on ${a.ticker} ===`);
   console.log(`Period: ${a.firstDate} -> ${a.lastDate} (${a.tradingDays} trading days, ~${a.years.toFixed(1)} years)`);
-  console.log(`Rule: BUY when price > MA20/50/200; SELL when price < MA20/50; trades next day; ${pct(COST_RATE, 2)} cost per switch`);
+  console.log(`Rule: BUY when price > MA20/50/200; SELL when price < MA20/50; trades next day; ${pct(costRate, 2)} cost per switch`);
+  console.log(`Prices: ${adjusted ? 'TOTAL RETURN (splits + dividends reinvested, adjust=all)' : 'split-adjusted only — dividends excluded'}`);
+  const stale = stalenessWarning(history);
+  if (stale) console.log(stale);
   console.log(`Data fetched: ${a.fetchedAt} (cached — pass --refresh to update)\n`);
 
   const row = (name, m) => console.log(
@@ -62,7 +69,13 @@ async function main() {
 
   console.log(`  Caveats (every run, on purpose):`);
   console.log(`  - One ticker, one history: picking a stock we already like IS survivorship bias.`);
-  console.log(`  - Dividends excluded on both sides; understates buy-and-hold most (strategy sits in cash sometimes).`);
+  if (adjusted) {
+    console.log(`  - Total-return prices: signals here are computed on dividend-adjusted closes, so they can`);
+    console.log(`    differ slightly from the live dashboard's (which sees split-adjusted prices only).`);
+  } else {
+    console.log(`  - Dividends excluded on both sides; understates buy-and-hold most (strategy sits in cash`);
+    console.log(`    sometimes). Re-run with --adjust for total-return numbers.`);
+  }
   console.log(`  - Cash earns 0% here; real cash earns T-bill rates, so the strategy is slightly understated too.`);
   console.log(`  - Overlapping horizon windows aren't independent samples — hit-rate counts overstate confidence.`);
   console.log(`  - No parameters were fitted to this data (the rule predates the test), so there's no train/test`);

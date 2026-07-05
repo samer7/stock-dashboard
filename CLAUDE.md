@@ -88,6 +88,7 @@ node run.js AAPL              # single-ticker report (cached data)
 node run.js AAPL --refresh    # refetch history
 node sweep.js                 # 18-ticker default basket, scoreboard + pooled hit rates
 node sweep.js AAPL MSFT KO    # custom basket
+# flags for both: --adjust (total-return prices), --cost=0.002, --refresh (run.js only)
 ```
 
 Frontend: just open `index.html` in a browser. No build, no server needed for the frontend itself.

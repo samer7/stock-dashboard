@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.2] - 2026-07-05
+### Added
+- `--adjust` flag on `run.js` and `sweep.js`: fetches TOTAL-RETURN prices (splits + dividends reinvested, `adjust=all`), cached separately per ticker. Fixes the one genuinely wrong set of numbers from 0.9.1 — price-only data understated buy-and-hold on dividend payers (AT&T: -2.1% price-only vs +3.5% CAGR total return)
+- `--cost=X` flag: sensitivity check on the per-switch cost assumption
+- Staleness warning when cached history is older than 30 days (cache still never auto-expires — reproducibility first, but the report now says when its data is old)
+
+### Notes
+- Both robustness checks STRENGTHEN the 0.9.1 verdict: with dividends reinvested the MA rule loses to buy-and-hold 0/6 on return and 0/6 on Sharpe across T/KO/PG/JNJ/XOM/SPY; and the AAPL result holds at every cost level from 0% to 0.2% per switch (strategy 14.5%→12.2% CAGR vs 25.1% buy-and-hold throughout)
+- In `--adjust` mode, signals are computed on dividend-adjusted closes and can differ slightly from the live dashboard's (split-adjusted) signals — the report's caveats say which mode produced it
+
+---
+
 ## [0.9.1] - 2026-07-05
 ### Added
 - **Multi-ticker sweep** (`node sweep.js [tickers...]`): runs the full backtest across a deliberately mixed default basket of 18 tickers — index ETFs (SPY/QQQ/IWM), mega-winners (AAPL/MSFT/NVDA/GOOGL/AMZN), defensives (KO/PG/JNJ/JPM/XOM), and long-term strugglers (INTC/T/F/BA/PFE) — so the rule is tested on histories it would not have enjoyed, not just stocks we already like. Per-ticker table, a scoreboard (how often the strategy beats buy-and-hold on return / Sharpe / drawdown), and horizon hit rates POOLED across all signal-days rather than averaged per ticker. Fetching is rate-limit aware (spaced under Twelve Data's 8 calls/min, with wait-and-retry)

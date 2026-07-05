@@ -20,8 +20,14 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const CACHE_DIR = path.join(__dirname, 'cache');
 const API_KEY = process.env.TWELVE_DATA_API_KEY;
 
-async function loadDailyHistory(ticker, { refresh = false } = {}) {
-  const file = path.join(CACHE_DIR, `${ticker}.json`);
+// `adjusted: false` (default) fetches split-adjusted closes — the same view of
+// prices the live dashboard computes signals from. `adjusted: true` fetches
+// TOTAL-RETURN closes (splits AND dividends folded in, adjust=all), which is
+// the honest basis for long-run return comparisons: a stock paying 5%/year in
+// dividends (like AT&T) looks like a loser on price alone while actually
+// making money. The two views cache to separate files.
+async function loadDailyHistory(ticker, { refresh = false, adjusted = false } = {}) {
+  const file = path.join(CACHE_DIR, `${ticker}${adjusted ? '.adj' : ''}.json`);
 
   if (!refresh && fs.existsSync(file)) {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -31,7 +37,8 @@ async function loadDailyHistory(ticker, { refresh = false } = {}) {
     throw new Error('TWELVE_DATA_API_KEY is not set — expected it in server/.env');
   }
 
-  const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=1day&outputsize=5000&apikey=${API_KEY}`;
+  const adjust = adjusted ? '&adjust=all' : ''; // API default is splits-only
+  const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=1day&outputsize=5000${adjust}&apikey=${API_KEY}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.status === 'error' || !Array.isArray(data.values)) {
@@ -44,10 +51,18 @@ async function loadDailyHistory(ticker, { refresh = false } = {}) {
     .map(v => ({ date: v.datetime, close: parseFloat(v.close) }))
     .reverse();
 
-  const history = { ticker, fetchedAt: new Date().toISOString(), days };
+  const history = { ticker, adjusted, fetchedAt: new Date().toISOString(), days };
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(file, JSON.stringify(history));
   return history;
 }
 
-module.exports = { loadDailyHistory };
+// The cache never expires on purpose (reproducibility), but a report computed
+// on months-old data should say so. Returns a warning string or null.
+function stalenessWarning(history) {
+  const ageDays = (Date.now() - Date.parse(history.fetchedAt)) / 86_400_000;
+  if (ageDays <= 30) return null;
+  return `⚠ ${history.ticker} data is ${Math.round(ageDays)} days old — pass --refresh to refetch`;
+}
+
+module.exports = { loadDailyHistory, stalenessWarning };
