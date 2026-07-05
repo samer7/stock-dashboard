@@ -48,6 +48,15 @@ Queued topics (in order):
   per ~19y vs 150–233 for the daily rule) and wins the crisis windows
   (17/18, 13/18, 17/18 — slightly weaker in COVID, where a monthly cadence
   exits too slowly for a 23-day crash). Two variants, one conclusion.
+  **12-month TSMOM (2026-07-05, `--strategy=tsmom`, long/cash):** third
+  variant, same verdict — 3/18 on CAGR price-only, 0/6 total-return, matched
+  percentile 34%, drawdown shallower 16/18 on the fewest trades yet (13–41
+  per ~19y). The cross-variant pattern is the real finding: crisis protection
+  scales with reaction speed (COVID crash: daily rule 17/18, Faber 13/18,
+  TSMOM 11/18 — a 12-month lookback stays bullish through a 5-week crash),
+  while all three win the slow 2008 grind near-unanimously. Slow rules
+  protect against slow declines; fast rules catch fast ones and pay in
+  whipsaws. Three variants, one conclusion — the MA topic is closed.
   **Robustness checks (same date):** with dividends reinvested (`--adjust`,
   total-return prices) the verdict *strengthens* — 0/6 on both CAGR and Sharpe
   across the dividend-heavy names (T/KO/PG/JNJ/XOM/SPY); price-only data had

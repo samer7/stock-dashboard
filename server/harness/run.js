@@ -27,12 +27,12 @@ async function main() {
   // --cost=0.002: sensitivity check on the per-switch cost assumption.
   const costArg = args.find(a => a.startsWith('--cost='));
   const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
-  // --strategy=faber: Faber's (2007) 10-month SMA rule instead of the
-  // dashboard's daily MA20/50/200 rule.
+  // --strategy=faber|tsmom: the literature's monthly variants instead of the
+  // dashboard's daily MA20/50/200 rule (see strategies.js).
   const stratArg = args.find(a => a.startsWith('--strategy='));
   const strategy = stratArg ? stratArg.split('=')[1] : 'ma';
-  if (!ticker || Number.isNaN(costRate) || !['ma', 'faber'].includes(strategy)) {
-    console.error('Usage: node run.js TICKER [--refresh] [--adjust] [--cost=0.001] [--strategy=ma|faber]');
+  if (!ticker || Number.isNaN(costRate) || !['ma', 'faber', 'tsmom'].includes(strategy)) {
+    console.error('Usage: node run.js TICKER [--refresh] [--adjust] [--cost=0.001] [--strategy=ma|faber|tsmom]');
     process.exit(1);
   }
 
@@ -44,10 +44,14 @@ async function main() {
   }
 
   // ---------- Report ----------
-  const ruleDesc = strategy === 'faber'
-    ? 'Faber 10-month SMA: at month-end, in if close > 10-month average, else cash'
-    : 'BUY when price > MA20/50/200; SELL when price < MA20/50';
-  console.log(`\n=== Backtest: ${strategy === 'faber' ? 'Faber 10-month SMA' : 'dashboard MA signal'} on ${a.ticker} ===`);
+  const STRAT_NAMES = { ma: 'dashboard MA signal', faber: 'Faber 10-month SMA', tsmom: '12-month TSMOM (long/cash)' };
+  const STRAT_RULES = {
+    ma: 'BUY when price > MA20/50/200; SELL when price < MA20/50',
+    faber: 'Faber 10-month SMA: at month-end, in if close > 10-month average, else cash',
+    tsmom: '12-month TSMOM: at month-end, in if trailing 12-month return > 0, else cash',
+  };
+  const ruleDesc = STRAT_RULES[strategy];
+  console.log(`\n=== Backtest: ${STRAT_NAMES[strategy]} on ${a.ticker} ===`);
   console.log(`Period: ${a.firstDate} -> ${a.lastDate} (${a.tradingDays} trading days, ~${a.years.toFixed(1)} years)`);
   console.log(`Rule: ${ruleDesc}; trades next day; ${pct(costRate, 2)} cost per switch`);
   console.log(`Prices: ${adjusted ? 'TOTAL RETURN (splits + dividends reinvested, adjust=all)' : 'split-adjusted only — dividends excluded'}`);

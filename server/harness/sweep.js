@@ -58,6 +58,10 @@ async function main() {
   const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
   const stratArg = rawArgs.find(a => a.startsWith('--strategy='));
   const strategy = stratArg ? stratArg.split('=')[1] : 'ma';
+  if (!['ma', 'faber', 'tsmom'].includes(strategy)) {
+    console.error('Usage: node sweep.js [tickers...] [--adjust] [--cost=0.001] [--strategy=ma|faber|tsmom]');
+    process.exit(1);
+  }
   const args = rawArgs.filter(a => !a.startsWith('--'));
   const basket = args.length ? args.map(t => t.toUpperCase()) : DEFAULT_BASKET;
 
@@ -90,8 +94,14 @@ async function main() {
   }
 
   // ---------- Per-ticker table ----------
-  console.log(`\n=== Sweep: ${strategy === 'faber' ? 'Faber 10-month SMA' : 'dashboard MA signal'} across ${results.length} tickers ===`);
-  console.log(`Rule: ${strategy === 'faber' ? 'month-end close > 10-month SMA -> in, else cash' : 'BUY > MA20/50/200, SELL < MA20/50'}, next-day execution, ${pct(costRate, 2)} cost/switch`);
+  const STRAT_NAMES = { ma: 'dashboard MA signal', faber: 'Faber 10-month SMA', tsmom: '12-month TSMOM (long/cash)' };
+  const STRAT_RULES = {
+    ma: 'BUY > MA20/50/200, SELL < MA20/50',
+    faber: 'month-end close > 10-month SMA -> in, else cash',
+    tsmom: 'month-end trailing 12-month return > 0 -> in, else cash',
+  };
+  console.log(`\n=== Sweep: ${STRAT_NAMES[strategy]} across ${results.length} tickers ===`);
+  console.log(`Rule: ${STRAT_RULES[strategy]}, next-day execution, ${pct(costRate, 2)} cost/switch`);
   console.log(`Prices: ${adjusted ? "TOTAL RETURN (dividends reinvested)" : "split-adjusted only — dividends excluded (--adjust for total return)"}\n`);
   console.log(
     `  ${'ticker'.padEnd(7)}${'years'.padStart(6)}` +

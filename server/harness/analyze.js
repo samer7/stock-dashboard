@@ -4,23 +4,29 @@
 // the exact same computation; extracting it here means the two can never
 // drift apart and quietly report different numbers for the same ticker.
 
-const { maSignalSeries, faberSignalSeries } = require('./strategies');
+const { maSignalSeries, faberSignalSeries, tsmomSignalSeries } = require('./strategies');
 const { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats } = require('./backtest');
 const { totalReturn, cagr, sharpe, maxDrawdown } = require('./metrics');
 
-// strategy: 'ma' (the dashboard's daily MA20/50/200 rule, default) or
-// 'faber' (10-month SMA at month-ends — see strategies.js).
+// strategy: 'ma' (the dashboard's daily MA20/50/200 rule, default),
+// 'faber' (10-month SMA at month-ends), or 'tsmom' (12-month time-series
+// momentum at month-ends) — see strategies.js for each rule.
+const STRATEGIES = {
+  ma: (closes) => maSignalSeries(closes),
+  faber: (closes, dates) => faberSignalSeries(closes, dates),
+  tsmom: (closes, dates) => tsmomSignalSeries(closes, dates),
+};
+
 function analyze(history, { costRate = 0.001, strategy = 'ma' } = {}) {
   const allCloses = history.days.map(d => d.close);
   const allDates = history.days.map(d => d.date);
-  const allSignals = strategy === 'faber'
-    ? faberSignalSeries(allCloses, allDates)
-    : maSignalSeries(allCloses);
+  const allSignals = STRATEGIES[strategy](allCloses, allDates);
 
   // Every signal needs warmup (200 days for the MA rule, 10 month-ends for
-  // Faber). Chop it off so strategy and buy-and-hold are compared over
-  // EXACTLY the same days. (The two strategies' warmups differ by ~2 weeks,
-  // so cross-strategy comparisons are near-identical periods, not identical.)
+  // Faber, 13 for TSMOM). Chop it off so strategy and buy-and-hold are
+  // compared over EXACTLY the same days. (The warmups differ by a few months
+  // across strategies, so cross-strategy comparisons are near-identical
+  // periods, not identical.)
   const start = allSignals.findIndex(s => s !== null);
   if (start === -1) return null; // not enough history to warm up — can't test
 

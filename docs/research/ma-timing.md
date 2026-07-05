@@ -135,7 +135,20 @@ Falsifiable follow-ups, runnable in the harness:
    price-only and 0/6 total-return; drawdown shallower 15/18 with 4–8× fewer
    trades; median matched-shuffle percentile 47% (timing ≈ random placement).
 2. **12-month time-series momentum** (Moskowitz et al.) as an alternative rule —
-   same prediction. *(Not yet tested.)*
+   same prediction.
+   → **Tested 2026-07-05 (`--strategy=tsmom`, long/cash variant): prediction
+   held.** 3/18 on CAGR price-only and 0/6 total-return; drawdown shallower
+   16/18 with the fewest trades of all (13–41 per ~19y); median matched-shuffle
+   percentile 34%. Note this does NOT contradict Moskowitz et al. — their
+   profits come from a diversified long/short portfolio across ~58 futures
+   markets, and they never claim single-stock timing works. One instructive
+   detail: crisis protection scales with reaction speed. In the fast COVID
+   crash the daily rule won 17/18, Faber's 10-month rule 13/18, and 12-month
+   TSMOM only 11/18 (median −26.1% vs −30.7% — barely better than holding),
+   because a 12-month lookback stays "positive" well into a 5-week crash. In
+   the slow 2008 grind all three variants won near-unanimously (18/18 for
+   TSMOM). Slow rules protect against slow declines; only fast rules catch
+   fast ones — and fast rules pay for it in whipsaws.
 3. **A crisis-window test**: measure the strategies only over 2000–02, 2008–09,
    2020, 2022. The literature predicts the MA rule *should* clearly win those
    windows; if it doesn't, even the drawdown-dampening story fails for our rule.

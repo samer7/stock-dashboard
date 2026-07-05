@@ -4,6 +4,16 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.6] - 2026-07-05
+### Added
+- **12-month TSMOM strategy** (`tsmomSignalSeries` in `strategies.js`, `--strategy=tsmom`): long/cash time-series momentum — at month-end, in if the trailing 12-month return is positive, else cash. Completes the digest's three-variant test set; strategy selection in `analyze.js` is now a proper map (`ma`/`faber`/`tsmom`)
+
+### Notes
+- **Third variant, same verdict**: 3/18 on CAGR price-only, 0/6 total-return, median matched percentile 34%, drawdown shallower 16/18 on the fewest trades yet (13–41 per ~19y). Does not contradict Moskowitz et al. (2012) — their result is a diversified long/short futures portfolio, not single-stock timing
+- **Cross-variant finding — protection scales with reaction speed**: COVID crash wins were 17/18 (daily MA) vs 13/18 (Faber 10-mo) vs 11/18 (TSMOM 12-mo, median −26.1% vs −30.7%), while all three won the slow 2008 grind near-unanimously. Slow rules protect against slow declines; fast rules catch fast ones and pay in whipsaws. All three digest follow-ups now tested; MA topic closed in `docs/research/ma-timing.md`
+
+---
+
 ## [0.9.5] - 2026-07-05
 ### Added
 - **Crisis-window test** (`crisisStats` in `backtest.js`, reported in `run.js` + pooled in `sweep.js`): strategy vs buy-and-hold inside S&P peak-to-trough windows (dot-com, financial crisis, COVID crash, 2022 bear) — the direct test of the drawdown-protection claim, with honest partial/no-coverage reporting (free-tier history starts mid-2007, so dot-com is uncovered)

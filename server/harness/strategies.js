@@ -74,4 +74,33 @@ function faberSignalSeries(closes, dates) {
   return out;
 }
 
-module.exports = { smaSeries, maSignalSeries, faberSignalSeries };
+// 12-month time-series momentum (Moskowitz, Ooi & Pedersen 2012), long/cash
+// version: at each month-end, be in the market if the trailing 12-month
+// return is positive (close above the month-end close 12 months ago), in
+// cash if negative. The original paper goes SHORT on negative momentum; our
+// simulator is long-or-cash only, so this is the defensive variant — which
+// is also the version retail "trend" portfolios actually use.
+//
+// Same month-end mechanics as faberSignalSeries: decisions ~12x/year, the
+// last decision carries forward between month-ends, next-day execution via
+// signalsToPositions, and the series' final (possibly partial) month never
+// generates a decision. Warmup: 13 month-ends (current + 12 back).
+function tsmomSignalSeries(closes, dates) {
+  const out = new Array(closes.length).fill(null);
+  const monthEndCloses = [];
+  let current = null;
+  for (let i = 0; i < closes.length; i++) {
+    const isMonthEnd = i < closes.length - 1 && dates[i].slice(0, 7) !== dates[i + 1].slice(0, 7);
+    if (isMonthEnd) {
+      monthEndCloses.push(closes[i]);
+      if (monthEndCloses.length >= 13) {
+        const twelveMonthsAgo = monthEndCloses[monthEndCloses.length - 13];
+        current = closes[i] > twelveMonthsAgo ? 'BUY' : 'SELL';
+      }
+    }
+    out[i] = current;
+  }
+  return out;
+}
+
+module.exports = { smaSeries, maSignalSeries, faberSignalSeries, tsmomSignalSeries };
