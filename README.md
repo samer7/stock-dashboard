@@ -2,7 +2,20 @@
 
 A personal stock market dashboard for tracking trends, technical signals, and congressional trading activity.
 
-> **Status:** Prototype. Everything shown is real data via a deployed backend: **live prices**, **MA-based signals**, **RSI/MACD**, and **House congressional trades**. Nothing is simulated anymore — the last mock piece (a hand-written signal history log) was removed; that section now honestly says "not tracked yet". See "Honest state" below.
+> **Status:** Prototype. Everything shown is real data via a deployed backend: **live prices**, **MA-based signals**, **RSI/MACD**, **House congressional trades**, and **news headlines**. Nothing is simulated anymore — the last mock piece (a hand-written signal history log) was removed; that section now honestly says "not tracked yet". See "Honest state" below.
+
+## Project direction (recalibrated 2026-07)
+
+What this project is trying to become, in one sentence: **a free, self-contained, algorithm-only dashboard where every signal is grounded in published research, measured against honest benchmarks, and congressional trading activity gets maximum daylight.**
+
+The principles behind that sentence — these guide every roadmap decision:
+
+1. **Deterministic algorithms only — no AI-model dependency.** Every signal is classical computation (moving averages, statistics, parsed disclosures) that runs on our own server against free data feeds. This is a rigor choice, not just a cost choice: deterministic signals are reproducible, and reproducibility is what makes backtested track records trustworthy. (An LLM-based news-sentiment scorer was considered and deliberately rejected on these grounds.)
+2. **Research-grounded, as a source of truth.** The quantitative-finance literature is deep but scattered, and the retail layer on top of it is mostly clickbait. Each signal here should trace back to published research (digested into `docs/research/` with citations) and forward to its own measured live performance. Research → implementation → out-of-sample verification, one topic at a time.
+3. **Honest measurement over impressive claims.** No signal is presented as trustworthy until the evaluation harness (Phase 5) has measured it out-of-sample, with costs, against buy-and-hold. The realistic ceiling for any signal is a small, compounding edge (roughly 53–58% hit rates at best — what real quant funds achieve), never near-certainty. If a signal can't beat "just hold an index fund," the dashboard should say exactly that.
+4. **Horizons: weekly to long-term.** Day trading is explicitly out of scope. Our data suits longer horizons: moving averages are weeks-to-months tools, and congressional disclosures (up to 45 days delayed) are only plausibly informative at ~6–12 months. Signals will eventually be evaluated and displayed per horizon (1 week / 1 month / 3 months / 1 year).
+5. **Congressional transparency "on blast."** STOCK Act disclosures are public but painful to access. Surfacing them in full detail is valuable independent of any predictive power — and the honest caveat is that post-STOCK-Act research finds the predictive edge of congressional trades to be much smaller than the famous pre-2012 studies suggested. Transparency first; alpha only if the harness proves it.
+6. **Readable by a novice.** The intended reader knows little about stocks. The UI should teach as it goes and never present an unvalidated number as authoritative.
 
 ---
 
@@ -11,7 +24,7 @@ A personal stock market dashboard for tracking trends, technical signals, and co
 - Watchlist of tracked tickers rendered as cards with price, daily change, and a signal badge
 - Sparkline per card for quick visual trend, drawn from real 30-day closes and colored by the 30-day trend
 - BUY / HOLD / SELL badges with signal-change indicators (e.g. HOLD → BUY)
-- Expandable detail view per ticker with 52w high/low, volume, market cap, and signal reasoning
+- Expandable detail view per ticker with 52w high/low, volume, signal reasoning, and recent news headlines
 - Congressional trade activity per ticker (real U.S. House STOCK Act disclosures)
 - "Recent House activity" feed — the newest disclosed trades across **all** members, grouped by member and day, independent of the watchlist
 - Watchlist persists across sessions via `localStorage`
@@ -82,19 +95,30 @@ The critical phase: real price data flowing end-to-end.
 - ✅ Surface **untickered** disclosures as an aggregate — the feed's footer now counts every transaction row not shown as a trade (~410/year: U.S. treasuries dominate at ~240, then corporate bonds, ownership interests, private funds, plus the deliberately excluded options/crypto), broken down by official asset-type tag, so a member moving millions in treasuries no longer looks inactive
 - ✅ "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers, served by `GET /api/congress/recent` from the same parsed index. Trades are grouped by member + day in the UI, because one member rebalancing a portfolio can file dozens of same-day trades that would otherwise flood every row (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings). Future-dated filer typos are filtered out so they can't pin themselves to the top
 - ✅ Trade-size **band breakdown** — per-ticker distribution across the disclosure bands ($1K–$15K … $50M+) computed server-side over ALL of the ticker's trades in the window (not just the 25 shown), rendered as thin buy/sell meters in the detail panel; feed summary rows also carry a size note ("mostly $1K–$15K"). PTRs only disclose ranges, so the band distribution is the most honest size view possible
-- ✅ News headlines — `GET /api/news/:ticker` proxies Finnhub's free company-news endpoint (last 7 days, deduplicated, newest 8), rendered as a "Recent news" section in the detail panel with real article links. Sentiment is deliberately **not** scored yet — plain headlines shown honestly beat a crude classifier bolted on; scoring is its own follow-up decision (transparent word-list vs. LLM call)
-- 🔲 News sentiment classification (follow-up to the headlines above)
+- ✅ News headlines — `GET /api/news/:ticker` proxies Finnhub's free company-news endpoint (last 7 days, deduplicated, newest 8), rendered as a "Recent news" section in the detail panel with real article links
+- ✅ News sentiment classification — **resolved by NOT building it** (2026-07). An LLM scorer (Claude Haiku/Sonnet) was fully costed and a keyword lexicon (Loughran-McDonald) evaluated; both rejected under the no-AI-model / deterministic-only principle — the lexicon's error rate would decorate headlines with confidently wrong labels, and an LLM breaks reproducibility and self-containment. Headlines stay unscored; readers judge them. (A clearly-labeled word-list could be revisited later if the research pipeline finds evidence it helps.)
 - 🔲 Senate disclosures — separate eFD system behind a click-through agreement; own mini-project, deferred
+
+### 🔲 Research pipeline (ongoing workstream, starts alongside Phase 5)
+
+The "source of truth" goal, run as a loop — one topic at a time:
+
+1. **Digest** — survey the published research on a topic and write a plain-language summary with citations into `docs/research/`
+2. **Implement** — where the research describes a testable rule, code it as a deterministic signal
+3. **Verify** — backtest it out-of-sample in the Phase 5 harness and display the live track record next to the citation
+
+First topics queued: moving-average timing rules (we already compute MA20/50/200 — does the literature say crossover strategies beat buy-and-hold?), momentum (the most robust anomaly in the literature), and congressional-trading studies (Ziobrowski's pre-2012 findings vs. the weaker post-STOCK-Act results).
 
 ### 🔲 Phase 5 — Signal rigor & evaluation harness
 
-The honest core of the project. **Reframed goal:** not "predict prices precisely" (not achievable by anyone — even the best quant funds win ~51% of trades), but **quantify uncertainty well and find small, statistically validated edges, measured without self-deception.** "Minimal error" claims almost always come from lookahead bias, overfitting, survivorship bias, or ignoring costs — so the harness comes *before* any fancy model.
+The honest core of the project. **Goal:** not "predict prices precisely" (not achievable by anyone — even the best quant funds win ~51% of trades), but **quantify uncertainty well and find small, statistically validated edges, measured without self-deception.** "Minimal error" claims almost always come from lookahead bias, overfitting, survivorship bias, or ignoring costs — so the harness comes *before* any fancy model.
 
-- **5a — Evaluation harness first:** a portfolio simulator with walk-forward (out-of-sample) testing, transaction costs + slippage, proper error metrics, and baselines to beat (buy-and-hold and a random walk). No strategy is trusted until it beats those out-of-sample.
+- **5a — Evaluation harness first:** a portfolio simulator with walk-forward (out-of-sample) testing, transaction costs + slippage, proper error metrics, and baselines to beat (buy-and-hold and a random walk). No strategy is trusted until it beats those out-of-sample. **Multi-horizon by design:** every signal is evaluated separately at 1-week, 1-month, 3-month, and 1-year horizons, matching the project's weekly-to-long-term scope.
 - **5b — Probabilistic signals:** convert BUY/HOLD/SELL into *calibrated probabilities*; add volatility modeling (GARCH/EWMA — volatility is far more predictable than price); grade with proper scoring rules (Brier score, log-loss).
 - **5c — Weighted multi-signal model:** combine MA / RSI / MACD / congressional flow, each weighted by its validated track record (Bayesian or regularized regression; time-series cross-validation only).
 - **5d — Risk & sizing:** Sharpe / Sortino / max-drawdown reporting; Kelly-based position sizing.
-- Caveat to test, not assume: the congressional signal carries a ~45-day disclosure delay, so its predictive horizon is long and likely weak for short-term moves.
+- **5e — Per-member congressional track records:** apply the harness to disclosure data — "when Rep. X discloses a buy, what happens to that stock over the next 6–12 months?" for every active filer. Deterministic, backtestable, and the deepest form of the congressional-transparency goal; nobody offers this for free.
+- Caveat to test, not assume: the congressional signal carries a ~45-day disclosure delay, so its predictive horizon is long (≈6–12 months) and likely weak for short-term moves.
 
 ### 🔲 Phase 6 — Paper trading / simulated portfolio ("simulated run")
 
@@ -122,7 +146,7 @@ Decision point: this only matters if the tool is meant to be used by other peopl
 | Charts | Chart.js | same |
 | Hosting | GitHub Pages | same for frontend |
 | Backend | Node + Express, deployed to Render | same |
-| Data | Finnhub (live quotes) + Twelve Data (history/signals) | + Quiver / news for later phases |
+| Data | Finnhub (live quotes + news) + Twelve Data (history/signals) + House Clerk (congress) | same — free, self-contained feeds only; no AI-model APIs |
 | Database | localStorage | Supabase (only if Phase 7 happens) |
 
 ---
