@@ -128,6 +128,10 @@ function horizonStats(closes, signals) {
       baseUpRate: allDays ? allUp / allDays : 0,   // "always bullish" gets this for free
       buyDays, buyHitRate: buyDays ? buyHits / buyDays : null,
       sellDays, sellHitRate: sellDays ? sellHits / sellDays : null,
+      // Raw counts too, so a multi-ticker sweep can POOL hits across tickers.
+      // (Averaging per-ticker rates would weight a 2-signal ticker the same as
+      // a 2000-signal one; pooling counts weights every signal day equally.)
+      buyHits, sellHits, allDays, allUp,
     };
   });
 }

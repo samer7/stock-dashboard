@@ -84,8 +84,10 @@ Run a backtest (no server needed; first run per ticker fetches ~20y of closes, t
 
 ```
 cd server/harness
-node run.js AAPL              # cached
+node run.js AAPL              # single-ticker report (cached data)
 node run.js AAPL --refresh    # refetch history
+node sweep.js                 # 18-ticker default basket, scoreboard + pooled hit rates
+node sweep.js AAPL MSFT KO    # custom basket
 ```
 
 Frontend: just open `index.html` in a browser. No build, no server needed for the frontend itself.

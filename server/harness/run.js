@@ -8,11 +8,12 @@
 // included, compared against buy-and-hold AND a seeded random-switching
 // baseline, hit rates shown per horizon against the base rate, and a caveats
 // section that prints every run — the limitations are part of the result.
+//
+// All computation lives in analyze.js (shared with sweep.js); this file only
+// loads data and formats the report.
 
 const { loadDailyHistory } = require('./data');
-const { maSignalSeries } = require('./strategies');
-const { signalsToPositions, simulate, buyAndHold, randomBaseline, percentileOf, horizonStats } = require('./backtest');
-const { totalReturn, cagr, sharpe, maxDrawdown } = require('./metrics');
+const { analyze } = require('./analyze');
 
 const COST_RATE = 0.001; // 0.1% of the portfolio per switch (commission + slippage)
 
@@ -28,51 +29,32 @@ async function main() {
   }
 
   const history = await loadDailyHistory(ticker, { refresh });
-  const allCloses = history.days.map(d => d.close);
-  const allSignals = maSignalSeries(allCloses);
-
-  // The signal needs 200 days of warmup. Chop the warmup off so the strategy
-  // and buy-and-hold are compared over EXACTLY the same days — comparing
-  // different periods is one of the classic ways backtests mislead.
-  const start = allSignals.findIndex(s => s !== null);
-  if (start === -1) {
-    console.error(`${ticker}: only ${allCloses.length} days of history — need 200+ for the MA200 signal.`);
+  const a = analyze(history, { costRate: COST_RATE });
+  if (!a) {
+    console.error(`${ticker}: only ${history.days.length} days of history — need 200+ for the MA200 signal.`);
     process.exit(1);
   }
-  const closes = allCloses.slice(start);
-  const signals = allSignals.slice(start);
-  const days = history.days.slice(start);
-
-  // Strategy, benchmark, and the random swarm.
-  const positions = signalsToPositions(signals);
-  const strat = simulate(closes, positions, { costRate: COST_RATE });
-  const bench = buyAndHold(closes, { costRate: COST_RATE });
-  const randomFinals = randomBaseline(closes, strat.trades, { trials: 1000, costRate: COST_RATE });
-  const beatRandom = percentileOf(randomFinals, strat.values.at(-1));
-  const horizons = horizonStats(closes, signals);
-
-  const daysInMarket = positions.reduce((a, b) => a + b, 0) / positions.length;
 
   // ---------- Report ----------
-  console.log(`\n=== Backtest: dashboard MA signal on ${ticker} ===`);
-  console.log(`Period: ${days[0].date} -> ${days.at(-1).date} (${closes.length} trading days, ~${(closes.length / 252).toFixed(1)} years)`);
+  console.log(`\n=== Backtest: dashboard MA signal on ${a.ticker} ===`);
+  console.log(`Period: ${a.firstDate} -> ${a.lastDate} (${a.tradingDays} trading days, ~${a.years.toFixed(1)} years)`);
   console.log(`Rule: BUY when price > MA20/50/200; SELL when price < MA20/50; trades next day; ${pct(COST_RATE, 2)} cost per switch`);
-  console.log(`Data fetched: ${history.fetchedAt} (cached — pass --refresh to update)\n`);
+  console.log(`Data fetched: ${a.fetchedAt} (cached — pass --refresh to update)\n`);
 
-  const row = (name, r) => console.log(
-    `  ${name.padEnd(14)} total ${pct(totalReturn(r.values)).padStart(9)}   CAGR ${pct(cagr(r.values)).padStart(7)}   Sharpe ${sharpe(r.values).toFixed(2).padStart(5)}   maxDD ${pct(maxDrawdown(r.values)).padStart(7)}   trades ${String(r.trades).padStart(4)}`
+  const row = (name, m) => console.log(
+    `  ${name.padEnd(14)} total ${pct(m.total).padStart(9)}   CAGR ${pct(m.cagr).padStart(7)}   Sharpe ${m.sharpe.toFixed(2).padStart(5)}   maxDD ${pct(m.maxDD).padStart(7)}   trades ${String(m.trades).padStart(4)}`
   );
-  row('MA strategy', strat);
-  row('Buy & hold', bench);
-  console.log(`  Time in market: ${pct(daysInMarket)} of days\n`);
+  row('MA strategy', a.strat);
+  row('Buy & hold', a.bench);
+  console.log(`  Time in market: ${pct(a.timeInMarket)} of days\n`);
 
   console.log(`  vs. random switching (1000 seeded trials, same trade count):`);
-  console.log(`  strategy beat ${pct(beatRandom)} of random strategies`);
+  console.log(`  strategy beat ${pct(a.beatRandom)} of random strategies`);
   console.log(`  (~50% = timing adds nothing; consistently >90-95% starts to mean something)\n`);
 
   console.log(`  Hit rates by horizon (vs. base rate = how often the stock was simply up):`);
   console.log(`  ${'horizon'.padEnd(10)} ${'base up-rate'.padStart(12)} ${'BUY hit'.padStart(9)} ${'(days)'.padStart(7)} ${'SELL hit'.padStart(9)} ${'(days)'.padStart(7)}`);
-  for (const h of horizons) {
+  for (const h of a.horizons) {
     console.log(`  ${h.label.padEnd(10)} ${pct(h.baseUpRate).padStart(12)} ${pct(h.buyHitRate).padStart(9)} ${String(h.buyDays).padStart(7)} ${pct(h.sellHitRate).padStart(9)} ${String(h.sellDays).padStart(7)}`);
   }
   console.log(`  A BUY hit = stock higher after the horizon; a SELL hit = stock lower (cash was right).`);

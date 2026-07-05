@@ -16,9 +16,19 @@ Queued topics (in order):
 
 - **Moving-average timing rules** — the dashboard already displays an MA20/50/200
   signal; does the literature (and our harness) say rules like it beat buy-and-hold?
-  Early harness result (2026-07): on AAPL and SPY over ~19 years, the dashboard's rule
-  underperforms buy-and-hold on total return and doesn't reliably beat random
-  switching — consistent with the post-1990s academic consensus on MA rules.
+  **Harness result (2026-07, 18-ticker sweep, ~19 years each — `node sweep.js`):**
+  the rule beat buy-and-hold on return in **1 of 18** tickers (Ford — a long
+  sideways/declining history, exactly where trend-following theory says exiting
+  helps) and on Sharpe in 1 of 18, but produced a **shallower max drawdown in 16
+  of 18**. Median "beat random switching" percentile: 39% — the *timing* carries
+  no information. The pooled hit rates make this vivid: BUY days were followed by
+  gains at almost exactly the base rate at every horizon (e.g. 61.4% vs 61.2%
+  base at 3 months, across ~35,000 signal-days), and SELL days likewise. The
+  drawdown reduction comes purely from being in the market only ~58% of the
+  time, not from picking *which* days. Conclusion so far: the signal is a
+  risk-dampener, not a return generator — consistent with the post-1990s
+  academic consensus on MA rules after costs. (Formal digest with citations
+  still to be written.)
 - **Momentum** — the most robust return anomaly in the academic literature
   (Jegadeesh & Titman 1993 and hundreds of follow-ups).
 - **Congressional trading** — Ziobrowski et al. (2004, 2011) found large excess

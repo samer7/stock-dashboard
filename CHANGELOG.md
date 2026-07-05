@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.1] - 2026-07-05
+### Added
+- **Multi-ticker sweep** (`node sweep.js [tickers...]`): runs the full backtest across a deliberately mixed default basket of 18 tickers — index ETFs (SPY/QQQ/IWM), mega-winners (AAPL/MSFT/NVDA/GOOGL/AMZN), defensives (KO/PG/JNJ/JPM/XOM), and long-term strugglers (INTC/T/F/BA/PFE) — so the rule is tested on histories it would not have enjoyed, not just stocks we already like. Per-ticker table, a scoreboard (how often the strategy beats buy-and-hold on return / Sharpe / drawdown), and horizon hit rates POOLED across all signal-days rather than averaged per ticker. Fetching is rate-limit aware (spaced under Twelve Data's 8 calls/min, with wait-and-retry)
+- Shared `analyze.js` module so `run.js` and `sweep.js` compute identical numbers (refactor verified byte-identical against the pre-refactor report)
+
+### Notes
+- **The sweep sharpened the verdict:** across 18 tickers / ~19 years each, the MA rule beat buy-and-hold on CAGR in 1/18 (Ford — a sideways history, where trend-following theory expects exits to help) and on Sharpe in 1/18, but cut max drawdown in 16/18. Median beat-random percentile 39%; pooled BUY-day hit rates equal base rates at every horizon (~35,000 signal-days). Timing adds nothing; the drawdown relief comes from simply being in the market only ~58% of the time. Recorded in `docs/research/README.md`
+- Free-data limitation stated in the report: only currently-listed symbols are fetchable, so even a mixed basket is survivor-tilted
+
+---
+
 ## [0.9.0] - 2026-07-05
 ### Added
 - **Phase 5a evaluation harness (first milestone)**: `server/harness/` — a standalone, deterministic backtesting CLI (`node run.js TICKER [--refresh]`) that tests the dashboard's own MA signal against ~20 years of daily closes (Twelve Data, one call per ticker, cached to disk for reproducibility). Includes: next-day execution so signals can't trade on information they didn't have yet; 0.1% transaction cost per switch; buy-and-hold benchmark over the identical period; a 1000-trial seeded random-switching baseline (same trade count — answers "is the timing better than luck?"); hit rates at 1-week/1-month/3-month/1-year horizons compared against base up-rates; Sharpe, CAGR, and max drawdown; and a caveats section that prints with every report
