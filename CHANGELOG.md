@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.8.0] - 2026-07-05
+### Added
+- Recent news headlines per ticker: new `GET /api/news/:ticker` backend endpoint proxying Finnhub's free company-news API (last 7 days, 30-minute cache), returning the newest 8 headlines deduplicated by normalized headline text (aggregators syndicate the same story under near-identical titles). The detail panel renders them as a "Recent news" section — each row is a real article link (http/https URLs only; `target="_blank" rel="noopener"`) with source and date
+- Honest states throughout: "Loading headlines…" while fetching, "No recent headlines for this ticker" when Finnhub returns none (its answer for unknown tickers too), and an error line if the backend is unreachable
+
+### Notes
+- Sentiment is deliberately NOT scored yet — the section footer says so ("sentiment not scored yet"). Bolting on a crude classifier would undermine the honest-data ethos; scoring is a separate follow-up with its own design decision (transparent word-list vs. LLM call)
+- Finnhub's relevance tagging is loose: a ticker's news includes general market stories that merely mention it. Accepted for now — they're real headlines, just broad
+- Verified end-to-end in headless Chrome against a local backend: 8 AAPL headlines with working links, invalid ticker shows the error card plus "No recent headlines", second API call serves `cached: true`, over-long ticker gets a 400
+
+---
+
 ## [0.7.1] - 2026-07-04
 ### Added
 - Unattributed-disclosure aggregate: the parser now counts every transaction row it does NOT surface as a trade (no clean ticker, options, crypto, exchanges) by asset-type tag. `/api/congress/recent` returns it as `unattributed`, and the feed footer renders one honest line: "Not shown: 410 more disclosed transactions with no clean stock ticker — mostly U.S. treasuries (244), corporate bonds (36), other assets (32)." Without this, a member moving millions in treasuries looked inactive

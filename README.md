@@ -82,8 +82,9 @@ The critical phase: real price data flowing end-to-end.
 - ✅ Surface **untickered** disclosures as an aggregate — the feed's footer now counts every transaction row not shown as a trade (~410/year: U.S. treasuries dominate at ~240, then corporate bonds, ownership interests, private funds, plus the deliberately excluded options/crypto), broken down by official asset-type tag, so a member moving millions in treasuries no longer looks inactive
 - ✅ "Recent House activity" feed — a non-ticker-filtered view of the latest disclosures across all active filers, served by `GET /api/congress/recent` from the same parsed index. Trades are grouped by member + day in the UI, because one member rebalancing a portfolio can file dozens of same-day trades that would otherwise flood every row (only ~84 of 435 reps trade individual stocks, and the top 10 are ~29% of filings). Future-dated filer typos are filtered out so they can't pin themselves to the top
 - ✅ Trade-size **band breakdown** — per-ticker distribution across the disclosure bands ($1K–$15K … $50M+) computed server-side over ALL of the ticker's trades in the window (not just the 25 shown), rendered as thin buy/sell meters in the detail panel; feed summary rows also carry a size note ("mostly $1K–$15K"). PTRs only disclose ranges, so the band distribution is the most honest size view possible
+- ✅ News headlines — `GET /api/news/:ticker` proxies Finnhub's free company-news endpoint (last 7 days, deduplicated, newest 8), rendered as a "Recent news" section in the detail panel with real article links. Sentiment is deliberately **not** scored yet — plain headlines shown honestly beat a crude classifier bolted on; scoring is its own follow-up decision (transparent word-list vs. LLM call)
+- 🔲 News sentiment classification (follow-up to the headlines above)
 - 🔲 Senate disclosures — separate eFD system behind a click-through agreement; own mini-project, deferred
-- 🔲 News headlines with sentiment classification
 
 ### 🔲 Phase 5 — Signal rigor & evaluation harness
 

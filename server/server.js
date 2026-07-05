@@ -64,6 +64,14 @@ const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 const historyCache = {};
 const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+// Cache for company news headlines. News changes faster than daily closes but
+// far slower than prices, so 30 minutes balances freshness against Finnhub's
+// rate limit (each watchlist ticker costs one news call on page load).
+const newsCache = {};
+const NEWS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const NEWS_WINDOW_DAYS = 7;  // how far back to ask Finnhub for headlines
+const NEWS_MAX_ITEMS = 8;    // trimmed list the UI actually renders
+
 // ---------- Congressional trades cache ----------
 // Unlike the quote/history caches (one entry per ticker), congressional data is
 // built as a SINGLE index covering every ticker at once. The reason: to find
@@ -421,6 +429,81 @@ app.get('/api/history/:ticker', async (req, res) => {
   } catch (err) {
     console.error('Error fetching history:', err);
     res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+
+// ---------- Company news ----------
+// GET /api/news/:ticker
+// Finnhub's free tier includes company news (unlike candles). We ask for the
+// last NEWS_WINDOW_DAYS of headlines and pass along a small, deduplicated,
+// newest-first list. Sentiment is deliberately NOT scored yet — showing plain
+// headlines honestly beats bolting on a crude classifier; scoring is a
+// follow-up with its own design decision (word-list vs. LLM).
+
+// Unix seconds -> "Jul 3", matching the short dates used elsewhere in the UI.
+function formatNewsDate(unixSeconds) {
+  const d = new Date(unixSeconds * 1000);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+app.get('/api/news/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+  if (!ticker || ticker.length > 6) {
+    return res.status(400).json({ error: 'Invalid ticker' });
+  }
+
+  const cached = newsCache[ticker];
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ ...cached.data, cached: true });
+  }
+
+  // Finnhub wants explicit from/to dates (YYYY-MM-DD).
+  const isoDay = (d) => d.toISOString().slice(0, 10);
+  const to = new Date();
+  const from = new Date(Date.now() - NEWS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const url = `https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${isoDay(from)}&to=${isoDay(to)}&token=${FINNHUB_API_KEY}`;
+
+  try {
+    const finnhubResponse = await fetch(url);
+    if (!finnhubResponse.ok) {
+      return res.status(finnhubResponse.status).json({
+        error: `Finnhub returned ${finnhubResponse.status}`,
+      });
+    }
+    const raw = await finnhubResponse.json();
+    // Finnhub returns [] for tickers with no coverage (and for invalid ones —
+    // unlike /quote there's no zero-price tell here). An empty list is a valid
+    // answer: the UI says "no recent headlines" rather than erroring.
+    if (!Array.isArray(raw)) {
+      return res.status(502).json({ error: 'Unexpected news response' });
+    }
+
+    // Newest first, then dedupe: aggregators syndicate the same story under
+    // near-identical headlines, so we key on the normalized headline text.
+    raw.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
+    const seen = new Set();
+    const articles = [];
+    for (const a of raw) {
+      if (!a.headline || !a.url) continue;
+      const key = a.headline.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      articles.push({
+        headline: a.headline,
+        source: a.source || '',
+        url: a.url,
+        date: formatNewsDate(a.datetime || 0),
+      });
+      if (articles.length >= NEWS_MAX_ITEMS) break;
+    }
+
+    const result = { ticker, articles, count: articles.length };
+    newsCache[ticker] = { data: result, expiresAt: Date.now() + NEWS_CACHE_TTL_MS };
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching news:', err);
+    res.status(500).json({ error: 'Failed to fetch news' });
   }
 });
 

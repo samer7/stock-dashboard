@@ -72,6 +72,11 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .congress-name { font-weight: 500; }
 .congress-meta { color: #888; }
 .congress-type-buy { color: #1a7a4a; } .congress-type-sell { color: #b83030; }
+.news-list { display: flex; flex-direction: column; gap: 6px; }
+.news-item { font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 8px; }
+.news-item a { color: #222; text-decoration: none; font-weight: 500; }
+.news-item a:hover { text-decoration: underline; }
+.news-meta { color: #888; margin-top: 2px; font-size: 11px; }
 .signal-log { display: flex; flex-direction: column; gap: 8px; }
 .log-item { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; }
 .log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
@@ -114,7 +119,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="demo-banner">
     <i class="ti ti-info-circle" style="font-size:14px;"></i>
-    All data shown is real: live prices, MA-based signals, 52w metrics, and House congressional trades · signal history isn’t tracked yet. First load can take ~30s while the free-tier backend wakes up.
+    All data shown is real: live prices, MA-based signals, 52w metrics, House congressional trades, and news headlines · signal history isn’t tracked yet. First load can take ~30s while the free-tier backend wakes up.
   </div>
 
   <div class="add-row">
@@ -171,6 +176,7 @@ function makeStock() {
     // right after a card is created — the pill shouldn't claim "no activity"
     // before we've actually looked.
     congress: [], congressBands: [], congressTotal: null, congressStatus: 'loading',
+    news: [], newsStatus: 'loading',
     quoteStatus: 'loading',
   };
 }
@@ -284,6 +290,25 @@ async function refreshCongress(ticker) {
   }
   renderCard(ticker); // refresh the card's congress pill with real counts
   if (isOpen()) showDetail(ticker);
+}
+
+// Fetches recent news headlines for a ticker (Finnhub company news, proxied by
+// the backend, last 7 days). Headlines only for now — sentiment scoring is a
+// deliberate follow-up, so nothing here pretends to know if news is good or bad.
+async function refreshNews(ticker) {
+  const isOpen = () => document.getElementById('detail-panel').dataset.ticker === ticker;
+  STOCKS[ticker].newsStatus = 'loading';
+  if (isOpen()) showDetail(ticker);
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/news/${ticker}`);
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    STOCKS[ticker].news = Array.isArray(data.articles) ? data.articles : [];
+    STOCKS[ticker].newsStatus = 'loaded';
+  } catch (e) {
+    STOCKS[ticker].newsStatus = 'error';
+  }
+  if (isOpen()) showDetail(ticker); // news only appears in the detail panel, not the card
 }
 
 // Friendly names for the asset tags that dominate the unattributed count, per
@@ -514,6 +539,30 @@ function renderCongress(d) {
   return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: U.S. House Clerk disclosures · House only.</div>';
 }
 
+// Build the news list for the detail panel. Each row is a real headline
+// linking to the article. Only http(s) URLs become links — anything else
+// renders as plain text (belt-and-suspenders against a bad API value).
+function renderNews(d) {
+  const news = d.news || [];
+  if (d.newsStatus === 'loading' && news.length === 0)
+    return '<div style="font-size:12px;color:#888;">Loading headlines…</div>';
+  if (d.newsStatus === 'error')
+    return '<div style="font-size:12px;color:#888;">Couldn’t load news right now.</div>';
+  if (news.length === 0)
+    return '<div style="font-size:12px;color:#888;">No recent headlines for this ticker.</div>';
+  const rows = news.map(a => {
+    const safeUrl = /^https?:\/\//i.test(a.url || '') ? a.url : null;
+    const headline = safeUrl
+      ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener">${esc(a.headline)}</a>`
+      : esc(a.headline);
+    return `<div class="news-item">
+      <div>${headline}</div>
+      <div class="news-meta">${esc(a.source || 'Unknown source')} · ${esc(a.date)}</div>
+    </div>`;
+  }).join('');
+  return rows + '<div style="font-size:11px;color:#aaa;padding:4px 2px;">Source: Finnhub company news · last 7 days · sentiment not scored yet.</div>';
+}
+
 function showDetail(ticker) {
   const d = STOCKS[ticker]; if (!d) return;
   const panel = document.getElementById('detail-panel');
@@ -551,6 +600,10 @@ function showDetail(ticker) {
         ${renderCongress(d)}
       </div>
       ${renderBands(d)}
+      <div class="section-label" style="margin-top:1rem;">Recent news</div>
+      <div class="news-list">
+        ${renderNews(d)}
+      </div>
       <div class="section-label" style="margin-top:1rem;">Signal history</div>
       <div class="signal-log">
         <div style="font-size:12px;color:#888;">Not tracked yet — signal-change logging is planned for a later phase.</div>
@@ -573,6 +626,7 @@ function addTicker() {
   refreshLiveQuote(val); // pull real price for the newly added ticker
   refreshSignal(val);    // pull real MA-based signal + sparkline
   refreshCongress(val);  // pull real House congressional trades
+  refreshNews(val);      // pull recent news headlines
 }
 
 function removeTicker(ticker) {
@@ -618,6 +672,7 @@ watchlist.forEach(t => {
   refreshLiveQuote(t); // live price/change from Finnhub
   refreshSignal(t);    // MA-based signal + real sparkline from Twelve Data
   refreshCongress(t);  // real House congressional trades from the House Clerk feed
+  refreshNews(t);      // recent news headlines (Finnhub company news)
 });
 refreshActivityFeed(); // cross-ticker feed of the newest House trades
 </script>
