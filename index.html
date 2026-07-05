@@ -128,7 +128,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   </div>
 
   <div class="legend">
-    <button id="legend-toggle" class="legend-toggle">How are signals computed?</button>
+    <button id="legend-toggle" class="legend-toggle">How are signals computed — and do they work?</button>
   </div>
   <div id="legend-content" class="legend-content">
     Signals are computed from real moving averages of daily closing prices:
@@ -136,6 +136,15 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
     <strong>SELL</strong> when price is below MA20 and MA50 (bearish short-term trend).
     <strong>HOLD</strong> for mixed or transitional alignment.
     The reason text on each ticker shows the actual price-vs-MA percentages.
+    <br><br>
+    <strong>Do they work?</strong> We backtested this exact rule over ~19 years of daily data
+    on 18 tickers. It did <strong>not</strong> beat simply buying and holding (1 of 18 tickers
+    on price returns, 0 of 6 once dividends are counted), and its timing carried no
+    information — the market rose after BUY days at the same rate as after any other day.
+    What it <em>did</em> do is soften crashes: maximum drawdown was shallower in 16 of 18
+    tickers, simply because the rule keeps you out of the market about 42% of the time.
+    So read <strong>BUY/SELL</strong> as a trend description and risk gauge
+    ("historically reduced drawdowns, did not beat buy-and-hold") — not as trade advice.
   </div>
 
   <div id="detail-panel" style="display:none;"></div>

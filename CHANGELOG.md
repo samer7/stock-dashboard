@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.3] - 2026-07-05
+### Changed
+- **Signal legend reframed to carry the measured result.** The "How are signals computed?" expander is now "How are signals computed — and do they work?" and answers honestly: backtested over ~19 years × 18 tickers, the MA rule did NOT beat buy-and-hold (1/18 price-only, 0/6 with dividends), its timing carried no information (BUY-day hit rates = base rates), and its one virtue is shallower drawdowns (16/18) from being out of the market ~42% of the time. BUY/SELL are framed as a trend description and risk gauge, not trade advice. Verified in headless Chrome (toggle works, no console errors)
+
+---
+
 ## [0.9.2] - 2026-07-05
 ### Added
 - `--adjust` flag on `run.js` and `sweep.js`: fetches TOTAL-RETURN prices (splits + dividends reinvested, `adjust=all`), cached separately per ticker. Fixes the one genuinely wrong set of numbers from 0.9.1 — price-only data understated buy-and-hold on dividend payers (AT&T: -2.1% price-only vs +3.5% CAGR total return)
