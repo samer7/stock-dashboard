@@ -4,6 +4,15 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.9] - 2026-07-05
+### Added
+- **RSI/MACD research digest** (`docs/research/rsi-macd.md`, 12 verified citations): both indicators are practitioner inventions with no founding academic evidence; the dashboard's exact MACD(12/26/9) rule showed no predictability in any of five developed markets (Chong, Ng & Liew 2014, verified against the primary PDF — including the 4-vs-2 significant-cell count); RSI's mean-reversion ancestor never lived in mega-caps and has decayed since 1995. Proposes the next harness test: `--strategy=macdcross` (long when MACD > signal line, else cash), with a pre-committed prediction of ~0/18 total-return wins
+
+### Notes
+- Docs-only release: digest drafted by a parallel research agent, then reviewed against the Chong-Ng-Liew primary source (two corrections: the misattributed 10-day-window caveat, the 45-cell count)
+
+---
+
 ## [0.9.8] - 2026-07-05
 ### Added
 - **Portfolio-mode simulator core** (`server/harness/portfolio.js`): multi-ticker date alignment, dollar-position simulation with rebalance-to-target-weights, costs charged per traded dollar (generalizes the single-ticker per-switch model), equal-weight buy-and-hold + equal-weight rebalanced benchmarks, and a seeded random-picks baseline. Deliberately the same engine Phase 6's paper trading will run forward

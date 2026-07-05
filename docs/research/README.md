@@ -124,6 +124,26 @@ Queued topics (in order):
   for the leaderboard (with hundreds of filers, someone always looks brilliant
   by chance).
 
+- **RSI and MACD** — the two indicators the dashboard already displays
+  (RSI(14), MACD(12/26/9)) but has never tested.
+  **Digest: [rsi-macd.md](rsi-macd.md)** (2026-07-05, 12 verified citations):
+  both are practitioner inventions with zero founding academic evidence
+  (Wilder's 1978 book; Appel's newsletter), and MACD > 0 is literally an
+  EMA12/EMA26 crossover — the MA family the harness already closed. The
+  direct academic tests find noise: the dashboard's exact MACD(12/26/9) rule
+  showed "no predictability" in any of five developed markets and was
+  significantly harmful in the DAX (Chong, Ng & Liew 2014, read from the
+  primary source); nothing survives data-snooping correction (Marshall et
+  al. 2008). RSI's one real ancestor — short-term reversal — never lived in
+  mega-caps and has decayed an order of magnitude since 1995 (Khandani & Lo
+  2007), and its surviving profit is a liquidity-provision payment a
+  next-day-execution retail rule can't capture (Da, Liu & Schaumburg 2014).
+  **Proposed harness test (not yet run): `--strategy=macdcross`** — long when
+  the MACD line is above its signal line, cash otherwise, standard 18-ticker
+  sweep. Prediction: ~0/18 total-return wins, hit rates = base rates, the
+  heaviest whipsaw bill yet; if so, RSI/MACD stay descriptive UI context and
+  don't enter Phase 5c scoring.
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
-[congressional-trading.md](congressional-trading.md). Other entries land here
-as the topics are researched.
+[congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md).
+Other entries land here as the topics are researched.
