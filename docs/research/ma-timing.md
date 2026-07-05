@@ -131,11 +131,20 @@ Falsifiable follow-ups, runnable in the harness:
    beat buy-and-hold total-return on most of the 18 tickers after costs, that would
    contradict Zakamulin and our verdict. Prediction from the literature: it won't
    beat on return, but should keep the drawdown benefit with fewer switches.
+   → **Tested 2026-07-05 (`--strategy=faber`): prediction held.** 5/18 on CAGR
+   price-only and 0/6 total-return; drawdown shallower 15/18 with 4–8× fewer
+   trades; median matched-shuffle percentile 47% (timing ≈ random placement).
 2. **12-month time-series momentum** (Moskowitz et al.) as an alternative rule —
-   same prediction.
+   same prediction. *(Not yet tested.)*
 3. **A crisis-window test**: measure the strategies only over 2000–02, 2008–09,
    2020, 2022. The literature predicts the MA rule *should* clearly win those
    windows; if it doesn't, even the drawdown-dampening story fails for our rule.
+   → **Tested 2026-07-05 (`crisisStats`): prediction held, decisively.** The
+   daily rule beat buy-and-hold in 49/54 ticker-windows (17/18 financial
+   crisis, median −9.5% vs −50.5%; 17/18 COVID; 15/18 2022). Faber's monthly
+   rule won 47/54, weakest in COVID (13/18) — a monthly cadence exits too
+   slowly for a 23-day crash. (2000–02 uncovered: free-tier history starts
+   mid-2007.) The drawdown-dampening story survives its falsification test.
 4. **An index/ETF-heavy basket**: the literature's residual claims are about broad
    markets, not single names; if drawdown reduction vanished on indexes, that would
    weaken the one benefit we currently advertise.

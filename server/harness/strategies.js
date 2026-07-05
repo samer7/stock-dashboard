@@ -41,4 +41,37 @@ function maSignalSeries(closes) {
   });
 }
 
-module.exports = { smaSeries, maSignalSeries };
+// Faber's (2007) 10-month SMA rule — the literature's favorite MA variant
+// (see docs/research/ma-timing.md). At each MONTH-END close: be in the market
+// if the close is above the average of the last 10 month-end closes
+// (including this one, per Faber's paper), in cash if below. Decisions only
+// happen ~12 times a year, so it whipsaws far less than daily MA rules.
+//
+// The signal for every day between month-ends just carries the last decision
+// forward — signalsToPositions treats a repeated BUY as "stay in", so trades
+// still execute the day after the month-end close (no lookahead). There's no
+// HOLD state: Faber's rule is binary, in or out.
+//
+// dates are 'YYYY-MM-DD' strings; a month-end is a day whose next trading day
+// falls in a different month. The series' final day is NOT treated as a
+// month-end (the month may be unfinished — deciding on a partial month would
+// use information Faber's monthly rule doesn't have).
+function faberSignalSeries(closes, dates) {
+  const out = new Array(closes.length).fill(null);
+  const monthEndCloses = [];
+  let current = null; // null until 10 month-ends exist
+  for (let i = 0; i < closes.length; i++) {
+    const isMonthEnd = i < closes.length - 1 && dates[i].slice(0, 7) !== dates[i + 1].slice(0, 7);
+    if (isMonthEnd) {
+      monthEndCloses.push(closes[i]);
+      if (monthEndCloses.length >= 10) {
+        const sma10 = monthEndCloses.slice(-10).reduce((a, b) => a + b, 0) / 10;
+        current = closes[i] > sma10 ? 'BUY' : 'SELL';
+      }
+    }
+    out[i] = current;
+  }
+  return out;
+}
+
+module.exports = { smaSeries, maSignalSeries, faberSignalSeries };

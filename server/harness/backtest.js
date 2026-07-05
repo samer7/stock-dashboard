@@ -231,6 +231,53 @@ function transitionStats(closes, signals) {
   });
 }
 
+// Crisis-window test: score the strategy ONLY inside the big equity declines.
+//
+// Why this exists: the literature's surviving claim for MA rules (and this
+// project's own measured result) is drawdown protection — the rule should
+// earn its keep precisely in prolonged bear markets. That claim is testable
+// on its own: compare strategy vs buy-and-hold inside each named window. If
+// the rule doesn't clearly lose less money in THESE windows, even the
+// risk-dampening story fails.
+//
+// Windows are S&P 500 peak-to-trough dates — market-wide crisis calendars,
+// deliberately not tuned per ticker. A window is scored over whatever part of
+// it the data covers (and says so): our histories start mid-2007, so the
+// dot-com bust is expected to come back uncovered.
+const { maxDrawdown } = require('./metrics');
+
+const CRISIS_WINDOWS = [
+  { label: 'Dot-com bust', from: '2000-03-24', to: '2002-10-09' },
+  { label: 'Financial crisis', from: '2007-10-09', to: '2009-03-09' },
+  { label: 'COVID crash', from: '2020-02-19', to: '2020-03-23' },
+  { label: '2022 bear market', from: '2022-01-03', to: '2022-10-12' },
+];
+
+// dates: 'YYYY-MM-DD' per day; stratValues/benchValues: daily portfolio worth
+// from the same simulation the headline numbers come from (no re-warmup).
+function crisisStats(dates, stratValues, benchValues) {
+  return CRISIS_WINDOWS.map((w) => {
+    let i0 = -1, i1 = -1;
+    for (let i = 0; i < dates.length; i++) {
+      if (i0 === -1 && dates[i] >= w.from) i0 = i;
+      if (dates[i] <= w.to) i1 = i;
+    }
+    if (i0 === -1 || i1 <= i0) return { ...w, covered: false };
+    const stratSeg = stratValues.slice(i0, i1 + 1);
+    const benchSeg = benchValues.slice(i0, i1 + 1);
+    return {
+      ...w,
+      covered: true,
+      coveredFrom: dates[i0], coveredTo: dates[i1],
+      partial: dates[i0] > w.from || dates[i1] < w.to,
+      stratReturn: stratSeg.at(-1) / stratSeg[0] - 1,
+      benchReturn: benchSeg.at(-1) / benchSeg[0] - 1,
+      stratDD: maxDrawdown(stratSeg),
+      benchDD: maxDrawdown(benchSeg),
+    };
+  });
+}
+
 // Small, well-known seeded pseudo-random generator. Not cryptographic — just
 // deterministic, which is all a reproducible backtest needs.
 function mulberry32(seed) {
@@ -244,4 +291,4 @@ function mulberry32(seed) {
   };
 }
 
-module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, HORIZONS };
+module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats, HORIZONS, CRISIS_WINDOWS };

@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.5] - 2026-07-05
+### Added
+- **Crisis-window test** (`crisisStats` in `backtest.js`, reported in `run.js` + pooled in `sweep.js`): strategy vs buy-and-hold inside S&P peak-to-trough windows (dot-com, financial crisis, COVID crash, 2022 bear) — the direct test of the drawdown-protection claim, with honest partial/no-coverage reporting (free-tier history starts mid-2007, so dot-com is uncovered)
+- **Faber (2007) 10-month SMA strategy** (`faberSignalSeries` in `strategies.js`, `--strategy=faber` on both CLIs): month-end close vs 10-month SMA, in/out binary — the literature's favorite MA variant, with 4–8× fewer trades than the daily rule
+
+### Notes
+- **The drawdown story survives its falsification test.** The daily MA rule beat buy-and-hold in 49/54 crisis ticker-windows: 17/18 in the financial crisis (median −9.5% vs −50.5%), 17/18 in the COVID crash (−4.8% vs −30.7%), 15/18 in the 2022 bear (−7.6% vs −25.8%). Its full-period return deficit is the premium paid for that protection
+- **Faber behaves exactly as the literature predicts**: still loses on return (5/18 price-only, 0/6 total-return), timing still ≈ random placement (median matched percentile 47%), but keeps the drawdown benefit (15/18) and wins crises (47/54; weakest in COVID, 13/18 — monthly cadence is too slow for a 23-day crash). Both digest predictions marked tested in `docs/research/ma-timing.md`
+
+---
+
 ## [0.9.4] - 2026-07-05
 ### Added
 - **Signal-transition (event) analysis** in the harness: `transitionStats()` in `backtest.js`, new "Event test" section in `run.js` and pooled across tickers in `sweep.js`. Measures up-rate AND average forward return after the days the signal *flips* to BUY/SELL, against the any-day baseline — because per-day hit rates count one six-month BUY as ~126 autocorrelated samples, while flips are the actual decisions (and what a dashboard user actually sees change)

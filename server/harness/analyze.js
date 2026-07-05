@@ -4,18 +4,25 @@
 // the exact same computation; extracting it here means the two can never
 // drift apart and quietly report different numbers for the same ticker.
 
-const { maSignalSeries } = require('./strategies');
-const { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats } = require('./backtest');
+const { maSignalSeries, faberSignalSeries } = require('./strategies');
+const { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats } = require('./backtest');
 const { totalReturn, cagr, sharpe, maxDrawdown } = require('./metrics');
 
-function analyze(history, { costRate = 0.001 } = {}) {
+// strategy: 'ma' (the dashboard's daily MA20/50/200 rule, default) or
+// 'faber' (10-month SMA at month-ends — see strategies.js).
+function analyze(history, { costRate = 0.001, strategy = 'ma' } = {}) {
   const allCloses = history.days.map(d => d.close);
-  const allSignals = maSignalSeries(allCloses);
+  const allDates = history.days.map(d => d.date);
+  const allSignals = strategy === 'faber'
+    ? faberSignalSeries(allCloses, allDates)
+    : maSignalSeries(allCloses);
 
-  // The signal needs 200 days of warmup. Chop it off so strategy and
-  // buy-and-hold are compared over EXACTLY the same days.
+  // Every signal needs warmup (200 days for the MA rule, 10 month-ends for
+  // Faber). Chop it off so strategy and buy-and-hold are compared over
+  // EXACTLY the same days. (The two strategies' warmups differ by ~2 weeks,
+  // so cross-strategy comparisons are near-identical periods, not identical.)
   const start = allSignals.findIndex(s => s !== null);
-  if (start === -1) return null; // fewer than 200 days of history — can't test
+  if (start === -1) return null; // not enough history to warm up — can't test
 
   const closes = allCloses.slice(start);
   const signals = allSignals.slice(start);
@@ -49,6 +56,7 @@ function analyze(history, { costRate = 0.001 } = {}) {
     timeInMarket: positions.reduce((a, b) => a + b, 0) / positions.length,
     horizons: horizonStats(closes, signals),
     transitions: transitionStats(closes, signals),
+    crises: crisisStats(days.map(d => d.date), strat.values, bench.values),
   };
 }
 

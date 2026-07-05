@@ -17,7 +17,7 @@
 
 const { loadDailyHistory, stalenessWarning } = require('./data');
 const { analyze } = require('./analyze');
-const { HORIZONS } = require('./backtest');
+const { HORIZONS, CRISIS_WINDOWS } = require('./backtest');
 
 // The default basket: 3 index ETFs, 5 mega-winners, 5 steady/defensive
 // names, 5 strugglers/cyclicals. ~18 API credits on first run (cached after).
@@ -56,6 +56,8 @@ async function main() {
   const adjusted = rawArgs.includes('--adjust');
   const costArg = rawArgs.find(a => a.startsWith('--cost='));
   const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
+  const stratArg = rawArgs.find(a => a.startsWith('--strategy='));
+  const strategy = stratArg ? stratArg.split('=')[1] : 'ma';
   const args = rawArgs.filter(a => !a.startsWith('--'));
   const basket = args.length ? args.map(t => t.toUpperCase()) : DEFAULT_BASKET;
 
@@ -71,7 +73,7 @@ async function main() {
       const history = await loadWithThrottle(ticker, adjusted);
       const stale = stalenessWarning(history);
       if (stale) warnings.push(stale);
-      const a = analyze(history, { costRate });
+      const a = analyze(history, { costRate, strategy });
       if (!a) { failed.push({ ticker, reason: `only ${history.days.length} days of history` }); continue; }
       results.push(a);
       process.stderr.write(`  ${ticker} done (${a.years.toFixed(1)}y${cached ? ', cached' : ''})\n`);
@@ -88,8 +90,8 @@ async function main() {
   }
 
   // ---------- Per-ticker table ----------
-  console.log(`\n=== Sweep: dashboard MA signal across ${results.length} tickers ===`);
-  console.log(`Rule: BUY > MA20/50/200, SELL < MA20/50, next-day execution, ${pct(costRate, 2)} cost/switch`);
+  console.log(`\n=== Sweep: ${strategy === 'faber' ? 'Faber 10-month SMA' : 'dashboard MA signal'} across ${results.length} tickers ===`);
+  console.log(`Rule: ${strategy === 'faber' ? 'month-end close > 10-month SMA -> in, else cash' : 'BUY > MA20/50/200, SELL < MA20/50'}, next-day execution, ${pct(costRate, 2)} cost/switch`);
   console.log(`Prices: ${adjusted ? "TOTAL RETURN (dividends reinvested)" : "split-adjusted only — dividends excluded (--adjust for total return)"}\n`);
   console.log(
     `  ${'ticker'.padEnd(7)}${'years'.padStart(6)}` +
@@ -145,6 +147,29 @@ async function main() {
       ` ${pct(sellDays ? sellHits / sellDays : null).padStart(9)} ${String(sellDays).padStart(8)}`
     );
   });
+
+  // ---------- Crisis windows ----------
+  // The direct test of the drawdown-protection claim: inside each S&P
+  // peak-to-trough window, did the strategy lose less than buy-and-hold?
+  console.log(`\n  Crisis windows (strategy vs buy-and-hold inside each decline):`);
+  console.log(`  ${'window'.padEnd(18)} ${'tickers'.padStart(8)} ${'strat wins'.padStart(11)} ${'median strat'.padStart(13)} ${'median b&h'.padStart(11)}`);
+  CRISIS_WINDOWS.forEach((W, wi) => {
+    const covered = results.map(a => a.crises[wi]).filter(c => c.covered);
+    if (!covered.length) {
+      console.log(`  ${W.label.padEnd(18)} ${'0'.padStart(8)}  (no history covers it)`);
+      return;
+    }
+    const wins = covered.filter(c => c.stratReturn > c.benchReturn).length;
+    const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+    console.log(
+      `  ${W.label.padEnd(18)} ${String(covered.length).padStart(8)}` +
+      ` ${`${wins}/${covered.length}`.padStart(11)}` +
+      ` ${pct(median(covered.map(c => c.stratReturn))).padStart(13)}` +
+      ` ${pct(median(covered.map(c => c.benchReturn))).padStart(11)}`
+    );
+  });
+  console.log(`  ("strat wins" = tickers where the strategy's return beat buy-and-hold's over the window.`);
+  console.log(`   This is where an MA rule is SUPPOSED to earn its keep — losing here kills the risk story.)`);
 
   // ---------- Pooled event test ----------
   // Signal-day counts above are autocorrelated (one long BUY = hundreds of

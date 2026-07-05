@@ -32,6 +32,22 @@ Queued topics (in order):
   harness verdict point for point, and its "what would change our mind" section
   queues the next falsifiable tests (Faber 10-month SMA, 12-month TSMOM,
   crisis-window analysis).
+  **Crisis-window test (2026-07-05, `crisisStats` — the direct test of the
+  drawdown claim):** inside the S&P peak-to-trough windows the rule is
+  supposed to win, it does, decisively — financial crisis: 17/18 tickers,
+  median −9.5% vs −50.5% buy-and-hold; COVID crash: 17/18, −4.8% vs −30.7%;
+  2022 bear: 15/18, −7.6% vs −25.8%. 49 of 54 ticker-windows. The
+  risk-dampener story survives its own falsification test: the rule's whole
+  full-period return deficit is the premium it pays (via whipsaws and missed
+  recoveries) for genuinely large protection in prolonged declines.
+  **Faber 10-month SMA (2026-07-05, `--strategy=faber`):** the literature's
+  favorite variant behaves exactly as predicted — still loses to buy-and-hold
+  on return (5/18 price-only, 0/6 total-return on the dividend names), timing
+  still indistinguishable from random placement (median matched percentile
+  47%), but keeps the drawdown benefit (15/18) with 4–8× fewer trades (21–60
+  per ~19y vs 150–233 for the daily rule) and wins the crisis windows
+  (17/18, 13/18, 17/18 — slightly weaker in COVID, where a monthly cadence
+  exits too slowly for a 23-day crash). Two variants, one conclusion.
   **Robustness checks (same date):** with dividends reinvested (`--adjust`,
   total-return prices) the verdict *strengthens* — 0/6 on both CAGR and Sharpe
   across the dividend-heavy names (T/KO/PG/JNJ/XOM/SPY); price-only data had
