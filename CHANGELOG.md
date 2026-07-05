@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.0] - 2026-07-05
+### Added
+- **Phase 5a evaluation harness (first milestone)**: `server/harness/` — a standalone, deterministic backtesting CLI (`node run.js TICKER [--refresh]`) that tests the dashboard's own MA signal against ~20 years of daily closes (Twelve Data, one call per ticker, cached to disk for reproducibility). Includes: next-day execution so signals can't trade on information they didn't have yet; 0.1% transaction cost per switch; buy-and-hold benchmark over the identical period; a 1000-trial seeded random-switching baseline (same trade count — answers "is the timing better than luck?"); hit rates at 1-week/1-month/3-month/1-year horizons compared against base up-rates; Sharpe, CAGR, and max drawdown; and a caveats section that prints with every report
+- `docs/research/` — home of the research-digest workstream, with the queued topics and the harness's first finding recorded
+
+### Notes
+- **First honest result:** the dashboard's MA signal underperforms buy-and-hold on ~19 years of AAPL (13.3% vs 25.1% CAGR) and SPY (2.1% vs 8.6%), and on SPY beats only 31% of random-switching strategies. Its real property is risk reduction: max drawdowns around -35% vs -60% for buy-and-hold. The signal survives as a "sleep at night" heuristic, not a return generator — exactly the kind of thing the harness exists to reveal
+- Runs are byte-for-byte reproducible: frozen data cache + seeded randomness (mulberry32), verified by diffing consecutive runs
+- The roadmap's recalibrated principles applied: deterministic only, honest measurement, per-horizon evaluation
+
+---
+
 ## [0.8.0] - 2026-07-05
 ### Added
 - Recent news headlines per ticker: new `GET /api/news/:ticker` backend endpoint proxying Finnhub's free company-news API (last 7 days, 30-minute cache), returning the newest 8 headlines deduplicated by normalized headline text (aggregators syndicate the same story under near-identical titles). The detail panel renders them as a "Recent news" section — each row is a real article link (http/https URLs only; `target="_blank" rel="noopener"`) with source and date

@@ -59,6 +59,8 @@ When working on Phase 5/6, keep the owner-is-learning ethos: explain the math, p
 | `server/package.json` | Node dependencies (express, cors, dotenv, adm-zip, pdf-parse). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |
+| `server/harness/` | Phase 5a backtesting harness (standalone CLI, not served by Express): `data.js` (history fetch + disk cache), `strategies.js` (signal rules — the MA rule MUST stay in sync with computeSignal in server.js), `backtest.js` (simulator, baselines, horizons), `metrics.js`, `run.js` (CLI). Deterministic by design: frozen cache + seeded randomness. |
+| `docs/research/` | Research-digest workstream: per-topic summaries of published quant-finance literature with citations, tied to harness results. |
 | `README.md` | Human-facing project overview and roadmap. |
 | `CHANGELOG.md` | Version history. |
 
@@ -76,6 +78,14 @@ Test the backend (from any directory, while the server is running):
 
 ```
 curl http://localhost:3000/api/quote/AAPL
+```
+
+Run a backtest (no server needed; first run per ticker fetches ~20y of closes, then reads the disk cache):
+
+```
+cd server/harness
+node run.js AAPL              # cached
+node run.js AAPL --refresh    # refetch history
 ```
 
 Frontend: just open `index.html` in a browser. No build, no server needed for the frontend itself.
