@@ -138,11 +138,15 @@ Queued topics (in order):
   mega-caps and has decayed an order of magnitude since 1995 (Khandani & Lo
   2007), and its surviving profit is a liquidity-provision payment a
   next-day-execution retail rule can't capture (Da, Liu & Schaumburg 2014).
-  **Proposed harness test (not yet run): `--strategy=macdcross`** — long when
-  the MACD line is above its signal line, cash otherwise, standard 18-ticker
-  sweep. Prediction: ~0/18 total-return wins, hit rates = base rates, the
-  heaviest whipsaw bill yet; if so, RSI/MACD stay descriptive UI context and
-  don't enter Phase 5c scoring.
+  **Harness verdict (2026-07-05, `--strategy=macdcross`): prediction
+  confirmed.** Total-return: 1/18 on CAGR (Ford again), 2/18 Sharpe, matched
+  percentile 43%, pooled hit rates = base rates at every horizon on ~45,000
+  signal-days, on the heaviest trade counts yet (364–438 per ~19.7y). Crisis
+  protection is the best of any variant (18/18 COVID, median −2.9% vs −30.7%),
+  completing the speed-vs-whipsaw spectrum: MACD 18/18 > daily MA 17/18 >
+  Faber 13/18 > TSMOM 11/18. No timing information; stays descriptive UI
+  context, does not enter 5c scoring. The RSI 30-recross event test (digest
+  check #2) remains open. Full verdict in [rsi-macd.md](rsi-macd.md) §7.
 
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md).

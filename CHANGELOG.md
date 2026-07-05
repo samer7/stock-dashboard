@@ -4,6 +4,15 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.10] - 2026-07-05
+### Added
+- **`--strategy=macdcross`** (`macdCrossSignalSeries` + `emaSeries` in `strategies.js`, mirroring server.js's MACD(12/26/9) math): long when the MACD line is above its 9-EMA signal line, else cash
+
+### Measured
+- **The rsi-macd.md §5 test, verdict as pre-committed: MACD's crossover carries no timing information** — 1/18 CAGR and 2/18 Sharpe on total-return, matched-shuffle percentile 43%, pooled hit rates = base rates on ~45,000 signal-days, on the heaviest trade counts of any rule (364–438 per ~19.7y). Crisis protection best-in-family (18/18 COVID), completing the speed-vs-whipsaw spectrum: MACD 18/18 > daily MA 17/18 > Faber 13/18 > TSMOM 11/18. Does not enter Phase 5c scoring
+
+---
+
 ## [0.9.9] - 2026-07-05
 ### Added
 - **RSI/MACD research digest** (`docs/research/rsi-macd.md`, 12 verified citations): both indicators are practitioner inventions with no founding academic evidence; the dashboard's exact MACD(12/26/9) rule showed no predictability in any of five developed markets (Chong, Ng & Liew 2014, verified against the primary PDF — including the 4-vs-2 significant-cell count); RSI's mean-reversion ancestor never lived in mega-caps and has decayed since 1995. Proposes the next harness test: `--strategy=macdcross` (long when MACD > signal line, else cash), with a pre-committed prediction of ~0/18 total-return wins

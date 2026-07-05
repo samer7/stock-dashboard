@@ -43,8 +43,8 @@ async function main() {
   const costRate = costArg ? parseFloat(costArg.split('=')[1]) : 0.001;
   const stratArg = rawArgs.find(a => a.startsWith('--strategy='));
   const strategy = stratArg ? stratArg.split('=')[1] : 'ma';
-  if (!['ma', 'faber', 'tsmom'].includes(strategy)) {
-    console.error('Usage: node sweep.js [tickers...] [--adjust] [--cost=0.001] [--strategy=ma|faber|tsmom]');
+  if (!['ma', 'faber', 'tsmom', 'macdcross'].includes(strategy)) {
+    console.error('Usage: node sweep.js [tickers...] [--adjust] [--cost=0.001] [--strategy=ma|faber|tsmom|macdcross]');
     process.exit(1);
   }
   const args = rawArgs.filter(a => !a.startsWith('--'));
@@ -77,11 +77,12 @@ async function main() {
   }
 
   // ---------- Per-ticker table ----------
-  const STRAT_NAMES = { ma: 'dashboard MA signal', faber: 'Faber 10-month SMA', tsmom: '12-month TSMOM (long/cash)' };
+  const STRAT_NAMES = { ma: 'dashboard MA signal', faber: 'Faber 10-month SMA', tsmom: '12-month TSMOM (long/cash)', macdcross: 'MACD(12/26/9) signal-line cross (long/cash)' };
   const STRAT_RULES = {
     ma: 'BUY > MA20/50/200, SELL < MA20/50',
     faber: 'month-end close > 10-month SMA -> in, else cash',
     tsmom: 'month-end trailing 12-month return > 0 -> in, else cash',
+    macdcross: 'MACD line > signal line -> in, else cash',
   };
   console.log(`\n=== Sweep: ${STRAT_NAMES[strategy]} across ${results.length} tickers ===`);
   console.log(`Rule: ${STRAT_RULES[strategy]}, next-day execution, ${pct(costRate, 2)} cost/switch`);

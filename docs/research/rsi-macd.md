@@ -170,6 +170,33 @@ no timing information. They do not enter Phase 5c scoring.
    concluding "RSI is dead" in general — though for *this* dashboard's basket the
    mega-cap result is the one that matters.
 
+## 7. Harness verdict (2026-07-05, v0.9.10)
+
+The §5 rule ran as `--strategy=macdcross` (`macdCrossSignalSeries` in `strategies.js`,
+mirroring server.js's MACD math exactly) over the standard 18-ticker sweep, ~19.7 years
+per ticker. **Check #1's pre-committed criterion: decisively not met.** Total-return,
+0.1% cost: the rule beat buy-and-hold on CAGR in **1/18** (Ford — the same sideways
+history every trend rule "wins") and Sharpe in 2/18; median matched-shuffle percentile
+**43%** — its placement of holding periods did slightly worse than random placements of
+the identical pattern. Pooled BUY hit rates equal base rates at every horizon (e.g.
+61.3% vs 61.4% base at 3 months, ~45,000 signal-days), and the ~3,570 pooled flips to
+BUY were followed by exactly any-day returns. Price-only numbers are the same shape
+(1/18, 1/18, median 53%).
+
+Two predicted signatures showed up on cue. **The whipsaw bill is the heaviest of any
+rule tested**: 364–438 trades per ticker (~2× the daily MA rule, ~10–20× the monthly
+rules). And **crisis protection is the best yet** — 16/18 in the financial crisis,
+**18/18 in the COVID crash** (median −2.9% vs −30.7%), 15/18 in 2022 — completing the
+speed-vs-whipsaw spectrum from ma-timing.md: COVID protection now reads
+MACD 18/18 > daily MA 17/18 > Faber 13/18 > TSMOM 11/18, with return deficit ordered
+the same way. The fastest trend rule buys the most protection and pays the most for it.
+
+**Bottom line: MACD's crossover carries no timing information; it is the MA family's
+fastest, most expensive member, and it does not enter Phase 5c scoring.** The UI keeps
+MACD (and RSI) as descriptive context, and the legend can now say this variant was
+tested too. The RSI(14) 30-recross event test (check #2) remains open — it is the one
+reversal-flavored hypothesis left, and the machinery for it already exists.
+
 ## References
 
 - Wilder, J.W. (1978). *New Concepts in Technical Trading Systems*. Trend Research.

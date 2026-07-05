@@ -4,7 +4,7 @@
 // the exact same computation; extracting it here means the two can never
 // drift apart and quietly report different numbers for the same ticker.
 
-const { maSignalSeries, faberSignalSeries, tsmomSignalSeries } = require('./strategies');
+const { maSignalSeries, faberSignalSeries, tsmomSignalSeries, macdCrossSignalSeries } = require('./strategies');
 const { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats } = require('./backtest');
 const { totalReturn, cagr, sharpe, maxDrawdown } = require('./metrics');
 
@@ -15,6 +15,7 @@ const STRATEGIES = {
   ma: (closes) => maSignalSeries(closes),
   faber: (closes, dates) => faberSignalSeries(closes, dates),
   tsmom: (closes, dates) => tsmomSignalSeries(closes, dates),
+  macdcross: (closes) => macdCrossSignalSeries(closes),
 };
 
 function analyze(history, { costRate = 0.001, strategy = 'ma' } = {}) {

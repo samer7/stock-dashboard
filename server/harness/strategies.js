@@ -103,4 +103,47 @@ function tsmomSignalSeries(closes, dates) {
   return out;
 }
 
-module.exports = { smaSeries, maSignalSeries, faberSignalSeries, tsmomSignalSeries };
+// Exponential moving average — same math as emaSeries in server.js (keep in
+// sync): seeded with the SMA of the first `period` values, then
+// prev*(1-k) + value*k with k = 2/(period+1). null until the seed exists.
+function emaSeries(values, period) {
+  const k = 2 / (period + 1);
+  const out = new Array(values.length).fill(null);
+  if (values.length < period) return out;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += values[i];
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
+// MACD(12/26/9) signal-line crossover as a long/cash rule — the test
+// pre-committed in docs/research/rsi-macd.md §5. Long when the MACD line
+// (EMA12 − EMA26) is above its signal line (EMA9 of the MACD line) at day
+// i's close, cash otherwise; next-day execution via signalsToPositions.
+// Mirrors macd() in server.js exactly: the MACD line exists once both EMAs
+// do, and the signal line's EMA9 runs over the DEFINED portion of the MACD
+// line (so warmup ends 9 MACD-days after day 25). Binary like Faber: no HOLD.
+function macdCrossSignalSeries(closes) {
+  const emaFast = emaSeries(closes, 12);
+  const emaSlow = emaSeries(closes, 26);
+  const macdLine = closes.map((_, i) =>
+    emaFast[i] !== null && emaSlow[i] !== null ? emaFast[i] - emaSlow[i] : null
+  );
+  const start = macdLine.findIndex(v => v !== null);
+  const out = new Array(closes.length).fill(null);
+  if (start === -1) return out;
+  const signalArr = emaSeries(macdLine.slice(start), 9);
+  for (let i = start; i < closes.length; i++) {
+    const sig = signalArr[i - start];
+    if (sig === null) continue;
+    out[i] = macdLine[i] > sig ? 'BUY' : 'SELL';
+  }
+  return out;
+}
+
+module.exports = { smaSeries, maSignalSeries, faberSignalSeries, tsmomSignalSeries, emaSeries, macdCrossSignalSeries };
