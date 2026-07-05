@@ -91,6 +91,55 @@ function randomBaseline(closes, nSwitches, { trials = 1000, costRate = 0.001, st
   return finals;
 }
 
+// A fairer random baseline: match time-in-market, not just trade count.
+//
+// randomBaseline above flips at random days, so its strategies spend ~50% of
+// days invested on average — but ours spends ~58%. In a market that mostly
+// rises, that difference ALONE makes our strategy look better than random,
+// with zero timing skill involved. The fix: take the strategy's own holding
+// pattern — its alternating runs of in-market and in-cash days — and shuffle
+// the run lengths (in-runs among in-runs, cash-runs among cash-runs). Every
+// trial then has the SAME number of switches and the SAME total days in the
+// market; the only thing randomized is WHERE the holding periods land. If the
+// real strategy can't beat these shuffles, its placement carries no
+// information beyond "be invested 58% of the time".
+function randomBaselineMatched(closes, positions, { trials = 1000, costRate = 0.001, startValue = 10_000, seed = 42 } = {}) {
+  // Decompose the position series into alternating runs: [{held, len}, ...].
+  const runs = [];
+  for (let i = 0; i < positions.length; i++) {
+    if (runs.length && runs.at(-1).held === positions[i]) runs.at(-1).len++;
+    else runs.push({ held: positions[i], len: 1 });
+  }
+  const inLens = runs.filter(r => r.held === 1).map(r => r.len);
+  const outLens = runs.filter(r => r.held === 0).map(r => r.len);
+  const startsHeld = runs.length > 0 && runs[0].held === 1;
+
+  const rand = mulberry32(seed);
+  const shuffle = (arr) => { // Fisher–Yates with the seeded generator
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const finals = [];
+  for (let t = 0; t < trials; t++) {
+    const ins = shuffle(inLens), outs = shuffle(outLens);
+    const pos = new Array(positions.length);
+    let idx = 0, held = startsHeld ? 1 : 0, ii = 0, oi = 0;
+    while (idx < positions.length) {
+      const len = held ? ins[ii++] : outs[oi++];
+      for (let k = 0; k < len && idx < positions.length; k++) pos[idx++] = held;
+      held = 1 - held;
+    }
+    finals.push(simulate(closes, pos, { costRate, startValue }).values.at(-1));
+  }
+  finals.sort((a, b) => a - b);
+  return finals;
+}
+
 // What fraction of the random finals our strategy beat. 0.95 means better
 // than 95% of random strategies — a decent sign the timing carries signal.
 // Around 0.5 means indistinguishable from luck.
@@ -136,6 +185,52 @@ function horizonStats(closes, signals) {
   });
 }
 
+// Event test: what happens after the signal FLIPS, rather than on every day
+// it happens to be showing.
+//
+// Why this exists: horizonStats counts every BUY *day*, but a BUY that stays
+// on for six months contributes ~126 rows that are really one decision — the
+// samples are massively autocorrelated, so those counts flatter our
+// confidence. The sharper question is event-based: on the day the signal
+// flips to BUY (it was something else yesterday), does the market behave any
+// differently afterwards than it does after a random day? Same for flips to
+// SELL. This is also exactly what a dashboard user experiences: they don't
+// see "day 83 of an ongoing BUY", they see "it just turned BUY".
+//
+// For each horizon we record, per flip type:
+//   - how many flips there were (far fewer than signal-days — honesty about N)
+//   - the up-rate afterwards (down-rate for SELL flips), vs the any-day base
+//   - the AVERAGE forward return, vs the any-day average (direction alone can
+//     hide magnitude: a flip could pick winners no more often but pick bigger
+//     ones — or vice versa)
+// Raw sums are included so sweep.js can pool events across tickers.
+//
+// Windows are measured from the flip day's close, like horizonStats (the
+// signal is knowable at that close; actual trading starts a day later).
+function transitionStats(closes, signals) {
+  return HORIZONS.map(({ label, days }) => {
+    const t = {
+      label, days,
+      buyFlips: 0, buyUps: 0, buyRetSum: 0,
+      sellFlips: 0, sellDowns: 0, sellRetSum: 0,
+      allDays: 0, allUps: 0, allRetSum: 0,
+    };
+    for (let i = 1; i < closes.length - days; i++) {
+      if (signals[i] === null || signals[i - 1] === null) continue; // warmup
+      const ret = closes[i + days] / closes[i] - 1;
+      const up = ret > 0;
+      t.allDays++; if (up) t.allUps++; t.allRetSum += ret;
+      if (signals[i] === 'BUY' && signals[i - 1] !== 'BUY') {
+        t.buyFlips++; if (up) t.buyUps++; t.buyRetSum += ret;
+      }
+      if (signals[i] === 'SELL' && signals[i - 1] !== 'SELL') {
+        t.sellFlips++; if (!up) t.sellDowns++; t.sellRetSum += ret;
+      }
+    }
+    return t;
+  });
+}
+
 // Small, well-known seeded pseudo-random generator. Not cryptographic — just
 // deterministic, which is all a reproducible backtest needs.
 function mulberry32(seed) {
@@ -149,4 +244,4 @@ function mulberry32(seed) {
   };
 }
 
-module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, percentileOf, horizonStats, HORIZONS };
+module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, HORIZONS };

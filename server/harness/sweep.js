@@ -96,7 +96,7 @@ async function main() {
     `${'strat CAGR'.padStart(12)}${'b&h CAGR'.padStart(10)}` +
     `${'strat DD'.padStart(10)}${'b&h DD'.padStart(9)}` +
     `${'strat Shrp'.padStart(11)}${'b&h Shrp'.padStart(9)}` +
-    `${'beatRnd'.padStart(9)}${'trades'.padStart(8)}`
+    `${'beatRnd'.padStart(9)}${'beatMtch'.padStart(9)}${'trades'.padStart(8)}`
   );
   for (const a of results) {
     console.log(
@@ -104,7 +104,7 @@ async function main() {
       `${pct(a.strat.cagr).padStart(12)}${pct(a.bench.cagr).padStart(10)}` +
       `${pct(a.strat.maxDD, 0).padStart(10)}${pct(a.bench.maxDD, 0).padStart(9)}` +
       `${a.strat.sharpe.toFixed(2).padStart(11)}${a.bench.sharpe.toFixed(2).padStart(9)}` +
-      `${pct(a.beatRandom, 0).padStart(9)}${String(a.strat.trades).padStart(8)}`
+      `${pct(a.beatRandom, 0).padStart(9)}${pct(a.beatMatched, 0).padStart(9)}${String(a.strat.trades).padStart(8)}`
     );
   }
 
@@ -117,12 +117,14 @@ async function main() {
   const sharpeWins = results.filter(a => a.strat.sharpe > a.bench.sharpe).length;
   const ddWins = results.filter(a => a.strat.maxDD > a.bench.maxDD).length; // less negative = shallower
   const medianBeat = results.map(a => a.beatRandom).sort((x, y) => x - y)[Math.floor(n / 2)];
+  const medianMatched = results.map(a => a.beatMatched).sort((x, y) => x - y)[Math.floor(n / 2)];
 
   console.log(`\n  Scoreboard (strategy vs buy-and-hold, ${n} tickers):`);
   console.log(`    higher return (CAGR):        ${retWins}/${n}`);
   console.log(`    better risk-adjusted (Sharpe): ${sharpeWins}/${n}`);
   console.log(`    shallower max drawdown:      ${ddWins}/${n}`);
-  console.log(`    median "beat random" percentile: ${pct(medianBeat, 0)}`);
+  console.log(`    median "beat random" percentile: ${pct(medianBeat, 0)} (same trade count)`);
+  console.log(`    median vs matched shuffles:      ${pct(medianMatched, 0)} (same trades AND time in market — the fairer test)`);
 
   // ---------- Pooled horizon hit rates ----------
   // Counts are POOLED across tickers (every signal-day weighs the same),
@@ -143,6 +145,32 @@ async function main() {
       ` ${pct(sellDays ? sellHits / sellDays : null).padStart(9)} ${String(sellDays).padStart(8)}`
     );
   });
+
+  // ---------- Pooled event test ----------
+  // Signal-day counts above are autocorrelated (one long BUY = hundreds of
+  // rows). Flips are the real decisions, and pooling them across the basket
+  // is what makes the counts respectable.
+  console.log(`\n  Pooled event test — what follows a signal FLIP (all tickers together):`);
+  console.log(`  ${'horizon'.padEnd(10)} ${'flips→BUY'.padStart(10)} ${'up-rate'.padStart(8)} ${'base'.padStart(7)} ${'avg ret'.padStart(8)} ${'any-day'.padStart(8)} | ${'flips→SELL'.padStart(10)} ${'down-rate'.padStart(9)} ${'avg ret'.padStart(8)}`);
+  HORIZONS.forEach((H, hi) => {
+    const p = { buyFlips: 0, buyUps: 0, buyRetSum: 0, sellFlips: 0, sellDowns: 0, sellRetSum: 0, allDays: 0, allUps: 0, allRetSum: 0 };
+    for (const a of results) {
+      const t = a.transitions[hi];
+      for (const k of Object.keys(p)) p[k] += t[k];
+    }
+    console.log(
+      `  ${H.label.padEnd(10)} ${String(p.buyFlips).padStart(10)}` +
+      ` ${pct(p.buyFlips ? p.buyUps / p.buyFlips : null).padStart(8)}` +
+      ` ${pct(p.allDays ? p.allUps / p.allDays : null).padStart(7)}` +
+      ` ${pct(p.buyFlips ? p.buyRetSum / p.buyFlips : null).padStart(8)}` +
+      ` ${pct(p.allDays ? p.allRetSum / p.allDays : null).padStart(8)}` +
+      ` | ${String(p.sellFlips).padStart(10)}` +
+      ` ${pct(p.sellFlips ? p.sellDowns / p.sellFlips : null).padStart(9)}` +
+      ` ${pct(p.sellFlips ? p.sellRetSum / p.sellFlips : null).padStart(8)}`
+    );
+  });
+  console.log(`  ("avg ret" = mean forward return from the flip day; "any-day" = same mean over all days.`);
+  console.log(`   SELL flips are a hit when the stock is LOWER after the horizon — its base rate is 1 - base.)`);
 
   if (failed.length) {
     console.log(`\n  Skipped: ${failed.map(f => `${f.ticker} (${f.reason})`).join('; ')}`);

@@ -55,9 +55,12 @@ async function main() {
   row('Buy & hold', a.bench);
   console.log(`  Time in market: ${pct(a.timeInMarket)} of days\n`);
 
-  console.log(`  vs. random switching (1000 seeded trials, same trade count):`);
-  console.log(`  strategy beat ${pct(a.beatRandom)} of random strategies`);
-  console.log(`  (~50% = timing adds nothing; consistently >90-95% starts to mean something)\n`);
+  console.log(`  vs. random switching (1000 seeded trials each):`);
+  console.log(`  same trade count:                  beat ${pct(a.beatRandom)} of random strategies`);
+  console.log(`  same trades AND time in market:    beat ${pct(a.beatMatched)} (holding periods shuffled in place)`);
+  console.log(`  (~50% = timing adds nothing; consistently >90-95% starts to mean something.`);
+  console.log(`   The second line is the fairer test — random flips only average ~50% invested,`);
+  console.log(`   so the first one partly rewards mere market exposure, not timing.)\n`);
 
   console.log(`  Hit rates by horizon (vs. base rate = how often the stock was simply up):`);
   console.log(`  ${'horizon'.padEnd(10)} ${'base up-rate'.padStart(12)} ${'BUY hit'.padStart(9)} ${'(days)'.padStart(7)} ${'SELL hit'.padStart(9)} ${'(days)'.padStart(7)}`);
@@ -66,6 +69,34 @@ async function main() {
   }
   console.log(`  A BUY hit = stock higher after the horizon; a SELL hit = stock lower (cash was right).`);
   console.log(`  Skill = hit rate above (BUY) / above 1-minus (SELL) the base rate, not above 50%.\n`);
+
+  // Event test: the table above counts every signal-DAY, but a BUY that stays
+  // on for months is really one decision counted hundreds of times. Here we
+  // look only at the days the signal FLIPS — the moment a dashboard user
+  // actually sees something change.
+  console.log(`  Event test — what follows a signal FLIP (vs. what follows any day):`);
+  console.log(`  ${'horizon'.padEnd(10)} ${'flips→BUY'.padStart(10)} ${'up-rate'.padStart(8)} ${'base'.padStart(7)} ${'avg ret'.padStart(8)} ${'any-day'.padStart(8)}`);
+  for (const t of a.transitions) {
+    console.log(
+      `  ${t.label.padEnd(10)} ${String(t.buyFlips).padStart(10)}` +
+      ` ${pct(t.buyFlips ? t.buyUps / t.buyFlips : null).padStart(8)}` +
+      ` ${pct(t.allDays ? t.allUps / t.allDays : null).padStart(7)}` +
+      ` ${pct(t.buyFlips ? t.buyRetSum / t.buyFlips : null).padStart(8)}` +
+      ` ${pct(t.allDays ? t.allRetSum / t.allDays : null).padStart(8)}`
+    );
+  }
+  console.log(`  ${'horizon'.padEnd(10)} ${'flips→SELL'.padStart(10)} ${'down-rate'.padStart(9)} ${'base'.padStart(7)} ${'avg ret'.padStart(8)} ${'any-day'.padStart(8)}`);
+  for (const t of a.transitions) {
+    console.log(
+      `  ${t.label.padEnd(10)} ${String(t.sellFlips).padStart(10)}` +
+      ` ${pct(t.sellFlips ? t.sellDowns / t.sellFlips : null).padStart(9)}` +
+      ` ${pct(t.allDays ? 1 - t.allUps / t.allDays : null).padStart(7)}` +
+      ` ${pct(t.sellFlips ? t.sellRetSum / t.sellFlips : null).padStart(8)}` +
+      ` ${pct(t.allDays ? t.allRetSum / t.allDays : null).padStart(8)}`
+    );
+  }
+  console.log(`  "avg ret" = mean return over the horizon starting at the flip; "any-day" = same mean over`);
+  console.log(`  ALL days. Few flips per ticker -> noisy; the sweep pools them across tickers.\n`);
 
   console.log(`  Caveats (every run, on purpose):`);
   console.log(`  - One ticker, one history: picking a stock we already like IS survivorship bias.`);

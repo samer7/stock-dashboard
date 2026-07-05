@@ -5,7 +5,7 @@
 // drift apart and quietly report different numbers for the same ticker.
 
 const { maSignalSeries } = require('./strategies');
-const { signalsToPositions, simulate, buyAndHold, randomBaseline, percentileOf, horizonStats } = require('./backtest');
+const { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats } = require('./backtest');
 const { totalReturn, cagr, sharpe, maxDrawdown } = require('./metrics');
 
 function analyze(history, { costRate = 0.001 } = {}) {
@@ -25,6 +25,7 @@ function analyze(history, { costRate = 0.001 } = {}) {
   const strat = simulate(closes, positions, { costRate });
   const bench = buyAndHold(closes, { costRate });
   const randomFinals = randomBaseline(closes, strat.trades, { trials: 1000, costRate });
+  const matchedFinals = randomBaselineMatched(closes, positions, { trials: 1000, costRate });
 
   const summarize = (r) => ({
     total: totalReturn(r.values),
@@ -44,8 +45,10 @@ function analyze(history, { costRate = 0.001 } = {}) {
     strat: summarize(strat),
     bench: summarize(bench),
     beatRandom: percentileOf(randomFinals, strat.values.at(-1)),
+    beatMatched: percentileOf(matchedFinals, strat.values.at(-1)),
     timeInMarket: positions.reduce((a, b) => a + b, 0) / positions.length,
     horizons: horizonStats(closes, signals),
+    transitions: transitionStats(closes, signals),
   };
 }
 

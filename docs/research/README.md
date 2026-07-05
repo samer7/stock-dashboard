@@ -27,8 +27,11 @@ Queued topics (in order):
   drawdown reduction comes purely from being in the market only ~58% of the
   time, not from picking *which* days. Conclusion so far: the signal is a
   risk-dampener, not a return generator — consistent with the post-1990s
-  academic consensus on MA rules after costs. (Formal digest with citations
-  still to be written.)
+  academic consensus on MA rules after costs. **Formal digest with citations:
+  [ma-timing.md](ma-timing.md)** (2026-07-05) — the literature corroborates the
+  harness verdict point for point, and its "what would change our mind" section
+  queues the next falsifiable tests (Faber 10-month SMA, 12-month TSMOM,
+  crisis-window analysis).
   **Robustness checks (same date):** with dividends reinvested (`--adjust`,
   total-return prices) the verdict *strengthens* — 0/6 on both CAGR and Sharpe
   across the dividend-heavy names (T/KO/PG/JNJ/XOM/SPY); price-only data had
@@ -36,9 +39,33 @@ Queued topics (in order):
   return). And the result is insensitive to the cost assumption: AAPL strategy
   CAGR is 14.5%/13.3%/12.2% at 0/0.1%/0.2% per-switch cost vs 25.1% buy-and-hold
   in all cases.
+  **Event test (2026-07-05, signal-transition analysis):** the pooled hit rates
+  above count every signal-*day*, but a BUY that stays on for months is one
+  decision counted hundreds of times (autocorrelated samples). The sharper test
+  looks only at the ~3,700 days the signal *flipped* to BUY (and ~3,840 flips
+  to SELL) across the 18-ticker basket: even at the moment of flipping, the
+  signal carries no information. After a flip to BUY, the up-rate matches the
+  any-day base at every horizon (e.g. 54.1% vs 54.7% at 1 week; 67.9% vs 68.4%
+  at 1 year), and the average forward return is actually slightly *below* the
+  any-day average at every horizon (13.9% vs 15.4% at 1 year). Flips to SELL
+  likewise: the market rose at the normal rate and by the normal amount after
+  them. Total-return prices on the six dividend names (~1,330 flips) show the
+  same pattern. So the earlier conclusion survives its toughest framing: not
+  only are BUY days no better than ordinary days, the *moment the signal turns*
+  — the thing a dashboard user actually reacts to — predicts nothing.
+  **Matched random baseline (same date):** the original random baseline matched
+  trade count but not time-in-market (random flips average ~50% invested vs the
+  strategy's ~58%), which slightly flattered the strategy in rising markets.
+  The fairer test shuffles the strategy's own holding periods in place — same
+  switches, same total days invested, only the placement randomized. Median
+  percentile across the basket: **34%** (vs 39% under the old baseline; AAPL
+  falls from 74% to 58%). Below 50% means the rule's actual placement of its
+  holding periods did slightly *worse* than random placements of the identical
+  pattern — fully consistent with the flip-level finding above.
 - **Momentum** — the most robust return anomaly in the academic literature
   (Jegadeesh & Titman 1993 and hundreds of follow-ups).
 - **Congressional trading** — Ziobrowski et al. (2004, 2011) found large excess
   returns pre-STOCK Act; post-2012 studies find the edge much smaller or gone.
 
-No digest is written yet — entries land here as the topics are researched.
+Digests so far: [ma-timing.md](ma-timing.md). Other entries land here as the
+topics are researched.

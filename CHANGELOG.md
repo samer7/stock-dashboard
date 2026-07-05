@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.4] - 2026-07-05
+### Added
+- **Signal-transition (event) analysis** in the harness: `transitionStats()` in `backtest.js`, new "Event test" section in `run.js` and pooled across tickers in `sweep.js`. Measures up-rate AND average forward return after the days the signal *flips* to BUY/SELL, against the any-day baseline — because per-day hit rates count one six-month BUY as ~126 autocorrelated samples, while flips are the actual decisions (and what a dashboard user actually sees change)
+
+- **Matched random baseline**: `randomBaselineMatched()` shuffles the strategy's own holding periods in place (seeded Fisher–Yates) — every trial has the same switch count AND the same days-in-market, so only the *placement* of holding periods is tested. Reported alongside the old trade-count-only baseline in `run.js` and as a new sweep column + scoreboard line
+- **First formal research digest**: `docs/research/ma-timing.md` — the MA-timing literature from Brock/Lakonishok/LeBaron (1992) through the data-snooping rebuttals (Sullivan/Timmermann/White 1999; Ready 2002; Bajgrowicz & Scaillet 2012; Fang et al. 2014; Zakamulin 2014/2018) to the modern risk-management reframing (Faber 2007; Moskowitz/Ooi/Pedersen 2012; Hurst et al. 2017; Moreira & Muir 2017). 11 verified citations; a table maps each literature claim to our harness measurement (they agree point for point); a "what would change our mind" section queues Faber's 10-month SMA, 12-month TSMOM, and crisis-window tests as the next falsifiable follow-ups
+
+### Notes
+- **Result: flips carry no information either.** Across ~3,700 →BUY flips (18 tickers, ~19y each), the up-rate after a flip matches the any-day base at every horizon, and the average forward return is slightly BELOW the any-day average (13.9% vs 15.4% at 1 year). →SELL flips likewise ≈ base. Same pattern on total-return prices (6 dividend names, ~1,330 flips). The strongest framing of the timing question so far, and the same answer. Recorded in `docs/research/README.md`
+- **The matched baseline sharpens it further**: median percentile falls from 39% (trade-count-only) to 34% — the rule places its holding periods slightly WORSE than random placement of the identical pattern (AAPL: 74% → 58%)
+
+---
+
 ## [0.9.3] - 2026-07-05
 ### Changed
 - **Signal legend reframed to carry the measured result.** The "How are signals computed?" expander is now "How are signals computed — and do they work?" and answers honestly: backtested over ~19 years × 18 tickers, the MA rule did NOT beat buy-and-hold (1/18 price-only, 0/6 with dividends), its timing carried no information (BUY-day hit rates = base rates), and its one virtue is shallower drawdowns (16/18) from being out of the market ~42% of the time. BUY/SELL are framed as a trend description and risk gauge, not trade advice. Verified in headless Chrome (toggle works, no console errors)
