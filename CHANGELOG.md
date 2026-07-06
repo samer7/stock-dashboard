@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.10.2] - 2026-07-06
+### Added
+- **Signal report card in the UI** — the detail panel now shows the dashboard's own measured backtest for its MA signal on that ticker: signal CAGR vs buy-and-hold CAGR, worst drawdown for both, trade count, and the matched-shuffle timing percentile, with a one-line honest reading (e.g. "underperformed buy-and-hold, but softened the worst crash"). Total-return prices, 0.1% cost/switch, ~19 years. Tickers outside the 18-name research basket say "not measured yet" instead of borrowing a number
+- **`server/harness/export.js`** — generates the embedded report-card data from the frozen harness cache (`node export.js`); the constant in index.html carries a generated-by header and regeneration instructions
+
+### Notes
+- This closes Phase 5a completely: harness, baselines, event tests, walk-forward machinery, and results surfaced in the UI
+- Verified in headless Chrome against the live backend (measured ticker shows numbers; unmeasured ticker shows the honest fallback; no console errors)
+
+---
+
 ## [0.10.1] - 2026-07-05
 ### Added
 - **Plain-language glossary** (`docs/research/glossary.md`): every term the digests and harness reports use — performance metrics, the honesty checks (base rates, matched random baselines, event tests, survivorship bias), fitting/overfitting/walk-forward, and strategy jargon — each defined against this project's own measured numbers, with a "where the results live" index. Linked from the research README and the root README
