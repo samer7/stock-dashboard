@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.10.1] - 2026-07-05
+### Added
+- **Plain-language glossary** (`docs/research/glossary.md`): every term the digests and harness reports use — performance metrics, the honesty checks (base rates, matched random baselines, event tests, survivorship bias), fitting/overfitting/walk-forward, and strategy jargon — each defined against this project's own measured numbers, with a "where the results live" index. Linked from the research README and the root README
+
+---
+
 ## [0.10.0] - 2026-07-05
 ### Added
 - **Walk-forward machinery** (`server/harness/walkforward.js`): the out-of-sample split engine for FITTED strategies — `fit()` sees only the training window (the API makes lookahead impossible rather than discouraged), `apply()` gets the full prefix for indicator warmup, only stitched test segments are scored; sliding or anchored windows. Every rule tested so far had zero fitted parameters; from 5b/5c onward anything chosen from data must pass through this

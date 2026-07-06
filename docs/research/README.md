@@ -4,6 +4,10 @@ This folder is the project's "source of truth" workstream: plain-language digest
 published quantitative-finance research, with citations, each tied to something this
 project implements and measures.
 
+New to the vocabulary (base rates, drawdowns, walk-forward, whipsaws…)? Start with
+the **[glossary](glossary.md)** — every term is defined against this project's own
+measured results, and it lists where each verdict is written up.
+
 The loop for every topic:
 
 1. **Digest** — survey the published research and summarize it here, with citations.

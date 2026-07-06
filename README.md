@@ -109,6 +109,8 @@ The "source of truth" goal, run as a loop — one topic at a time:
 
 First topics queued: moving-average timing rules (we already compute MA20/50/200 — does the literature say crossover strategies beat buy-and-hold?), momentum (the most robust anomaly in the literature), and congressional-trading studies (Ziobrowski's pre-2012 findings vs. the weaker post-STOCK-Act results).
 
+All measured verdicts are collected in [`docs/research/README.md`](docs/research/README.md), and [`docs/research/glossary.md`](docs/research/glossary.md) defines every term the digests and harness reports use (base rates, drawdowns, walk-forward, whipsaws…) in plain language, each tied to this project's own numbers.
+
 ### 🔸 Phase 5 — Signal rigor & evaluation harness (in progress)
 
 The honest core of the project. **Goal:** not "predict prices precisely" (not achievable by anyone — even the best quant funds win ~51% of trades), but **quantify uncertainty well and find small, statistically validated edges, measured without self-deception.** "Minimal error" claims almost always come from lookahead bias, overfitting, survivorship bias, or ignoring costs — so the harness comes *before* any fancy model.
