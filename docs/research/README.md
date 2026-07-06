@@ -145,8 +145,19 @@ Queued topics (in order):
   protection is the best of any variant (18/18 COVID, median −2.9% vs −30.7%),
   completing the speed-vs-whipsaw spectrum: MACD 18/18 > daily MA 17/18 >
   Faber 13/18 > TSMOM 11/18. No timing information; stays descriptive UI
-  context, does not enter 5c scoring. The RSI 30-recross event test (digest
-  check #2) remains open. Full verdict in [rsi-macd.md](rsi-macd.md) §7.
+  context, does not enter 5c scoring. Full verdict in [rsi-macd.md](rsi-macd.md) §7.
+  **RSI recross verdict (2026-07-05, `rsievent.js`): reversal is dead here
+  too.** 934 pooled RSI(14) 30-recross events (oversold is rare — 2.8% of
+  mega-cap ticker-days): at 1 week the up-rate is below base (53.0% vs 54.8%)
+  and the average forward return lands at the 1st percentile of 1,000
+  matched-random draws — slightly worse than random days; 1 month the same
+  (5th percentile); identical on total-return prices; no subperiod shows a
+  bump (2017+ turns the 1-week return negative, as Khandani & Lo predict).
+  The pre-committed 1w/1m criterion is decisively unmet — no tradable rule
+  specced. (A 94th-percentile blip at 3 months is examined and declined in
+  §8: wrong horizon for the hypothesis, crash-clustered events, tiny raw
+  gap.) Both displayed indicators are now tested end-to-end; both stay
+  descriptive. Full verdict in [rsi-macd.md](rsi-macd.md) §8.
 
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md).

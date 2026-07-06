@@ -197,6 +197,48 @@ MACD (and RSI) as descriptive context, and the legend can now say this variant w
 tested too. The RSI(14) 30-recross event test (check #2) remains open — it is the one
 reversal-flavored hypothesis left, and the machinery for it already exists.
 
+## 8. RSI recross verdict (2026-07-05, v0.9.11)
+
+Check #2 ran as `rsievent.js` (RSI math verified equal to server.js's `rsi()` to
+1e-9): every moment RSI(14) crossed back up through 30 — 934 pooled events across the
+18 tickers, ~19.7y each — scored as a flip→BUY through the existing `transitionStats`
+machinery, against the any-day base and 1,000 matched-random draws (same event count
+per ticker, random days). First context number: **RSI(14) < 30 happens on only 2.8% of
+mega-cap ticker-days**, exactly as the digest warned.
+
+**The reversal hypothesis fails at its own horizons.** At 1 week the recross up-rate is
+*below* base (53.0% vs 54.8%) and the average forward return is negative (−0.1% vs
++0.3% any-day) — the events' pooled average lands at the **1st percentile** of the
+matched-random distribution, i.e. slightly worse than picking the same number of days
+at random. Same at 1 month (56.5% vs 58.0%, +0.6% vs +1.2%, 5th percentile). On
+total-return prices the picture is identical (2nd percentile at both 1w and 1m). The
+pre-committed criterion — a real 1w/1m bump surviving `--adjust` — is decisively not
+met, so per §6 no tradable rule gets specced and `--cost` never enters the picture.
+
+Check #3's subperiod split behaves as Khandani & Lo predict, with nothing to shrink:
+2006–2016 shows a flat 1w (+0.3% vs +0.3%) and a below-base 1m; 2017+ turns the 1w
+*negative* (−0.5% vs +0.3%). No half, no price basis, no horizon under 3 months shows
+a bump.
+
+The one eyebrow-raiser is honest to report: at 3 months the pooled average lands at the
+94th percentile of matched-random (+4.0% vs +3.7% any-day). We don't chase it, for
+pre-committed reasons: it's the wrong horizon (the reversal ancestor is a *days*-scale
+effect — §3; at 3 months a bounce story has no mechanism), the raw gap is three tenths
+of a point, the 2017+ up-rate at 3m is *below* base (61.2% vs 62.5%), and recross
+events cluster inside the same few crash windows (2008–09, 2020) where *everything*
+eventually rebounded — clustering the uniform random null cannot mimic, so long-horizon
+percentiles are overconfident by construction. A 94th percentile at the horizon the
+hypothesis doesn't predict, from ~a dozen effective crash clusters, is the textbook
+shape of noise-plus-selection.
+
+**Bottom line: the last reversal-flavored hypothesis is closed. RSI(14)'s oversold
+recross carries no forward information in this basket at the horizons where the
+literature says reversal lives; RSI stays exactly what it already is in the UI —
+descriptive context — and does not enter Phase 5c scoring.** Both dashboard indicators
+are now tested end-to-end: §7 closed MACD's trend leg, §8 closes RSI's reversal leg.
+(Per check #4, this closes the question for *this* mega-cap basket, not for RSI on
+small/illiquid names — a caveat that matters only if the watchlist changes character.)
+
 ## References
 
 - Wilder, J.W. (1978). *New Concepts in Technical Trading Systems*. Trend Research.

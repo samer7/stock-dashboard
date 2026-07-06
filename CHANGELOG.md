@@ -4,6 +4,15 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.9.11] - 2026-07-05
+### Added
+- **RSI(14) 30-recross event test** (`server/harness/rsievent.js` + `rsiSeries` in `strategies.js`, Wilder smoothing verified equal to server.js's `rsi()` to 1e-9): pools every moment RSI crosses back up through 30 as a flip→BUY through the existing `transitionStats` machinery, vs any-day base rates and 1,000 seeded matched-random draws, with the 2006–2016 / 2017+ subperiod split
+
+### Measured
+- **The rsi-macd.md §6 check #2, verdict: the reversal hypothesis fails at its own horizons.** 934 pooled recross events (RSI < 30 on just 2.8% of mega-cap ticker-days): 1-week up-rate below base (53.0% vs 54.8%), average forward return at the 1st percentile of matched-random — slightly worse than random days; same at 1 month (5th pct); identical on total-return; 2017+ turns the 1-week return negative. Pre-committed 1w/1m criterion decisively unmet — no tradable rule specced; a 94th-percentile 3-month blip examined and declined (wrong horizon, crash-clustered events). Both displayed indicators (RSI + MACD) are now tested end-to-end and both stay descriptive. Full verdict in rsi-macd.md §8
+
+---
+
 ## [0.9.10] - 2026-07-05
 ### Added
 - **`--strategy=macdcross`** (`macdCrossSignalSeries` + `emaSeries` in `strategies.js`, mirroring server.js's MACD(12/26/9) math): long when the MACD line is above its 9-EMA signal line, else cash

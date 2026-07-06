@@ -103,6 +103,39 @@ function tsmomSignalSeries(closes, dates) {
   return out;
 }
 
+// RSI(14) for EVERY day — the per-day version of rsi() in server.js (keep the
+// math in sync): Wilder's smoothing, seeded with the plain average gain/loss
+// over the first `period` day-to-day changes, then each new day nudges the
+// running averages by 1/period. server.js only returns the FINAL value; this
+// returns the whole path, which is what an event test needs. out[i] is the
+// RSI at day i's close, null for the first `period` days (no seed yet).
+// Input is chronological (oldest → newest), like everything in the harness.
+function rsiSeries(closes, period = 14) {
+  const out = new Array(closes.length).fill(null);
+  if (closes.length < period + 1) return out;
+
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change >= 0) avgGain += change;
+    else avgLoss += -change;
+  }
+  avgGain /= period;
+  avgLoss /= period;
+  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+    const gain = change >= 0 ? change : 0;
+    const loss = change < 0 ? -change : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+}
+
 // Exponential moving average — same math as emaSeries in server.js (keep in
 // sync): seeded with the SMA of the first `period` values, then
 // prev*(1-k) + value*k with k = 2/(period+1). null until the seed exists.
@@ -146,4 +179,4 @@ function macdCrossSignalSeries(closes) {
   return out;
 }
 
-module.exports = { smaSeries, maSignalSeries, faberSignalSeries, tsmomSignalSeries, emaSeries, macdCrossSignalSeries };
+module.exports = { smaSeries, maSignalSeries, faberSignalSeries, tsmomSignalSeries, rsiSeries, emaSeries, macdCrossSignalSeries };
