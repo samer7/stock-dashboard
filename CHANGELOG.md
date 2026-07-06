@@ -4,6 +4,16 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.10.0] - 2026-07-05
+### Added
+- **Walk-forward machinery** (`server/harness/walkforward.js`): the out-of-sample split engine for FITTED strategies — `fit()` sees only the training window (the API makes lookahead impossible rather than discouraged), `apply()` gets the full prefix for indicator warmup, only stitched test segments are scored; sliding or anchored windows. Every rule tested so far had zero fitted parameters; from 5b/5c onward anything chosen from data must pass through this
+- **First walk-forward experiment** (`server/harness/wfma.js`): yearly re-pick the best of 8 SMA crossover pairs (fast 10/20/50 × slow 50/100/200) from the prior 5 years, trade it forward, ~15 folds/ticker — vs buy-and-hold, the fixed dashboard rule, an untuned 50/200 golden cross (the "never re-pick" control), and the hindsight-best pair (the in-sample cheat, quantified). Flags: `--adjust`, `--cost=`, `--metric=cagr|sharpe`, `--train=`, `--test=`, `--anchored`
+
+### Measured
+- **In-sample MA optimization carries no information — the ma-timing.md §2 decay claim, demonstrated on our own data.** 270 pooled picks: the training winner's test-year rank averaged 4.67/8 (no-information mean 4.50 ± 0.28), repeated as test winner 9% (chance 12.5%), median training CAGR 9.4% shrank to 1.8% realized; 0/18 vs buy-and-hold CAGR and Sharpe; **lost to the untuned golden cross 14/18** — the tuning itself cost money. Robust across `--adjust`, Sharpe-selection, and anchored windows (mean rank 4.44–4.70). Full postscript in ma-timing.md §7. With this, 5a's machinery list is complete (UI surfacing remains)
+
+---
+
 ## [0.9.11] - 2026-07-05
 ### Added
 - **RSI(14) 30-recross event test** (`server/harness/rsievent.js` + `rsiSeries` in `strategies.js`, Wilder smoothing verified equal to server.js's `rsi()` to 1e-9): pools every moment RSI crosses back up through 30 as a flip→BUY through the existing `transitionStats` machinery, vs any-day base rates and 1,000 seeded matched-random draws, with the 2006–2016 / 2017+ subperiod split

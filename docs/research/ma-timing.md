@@ -162,6 +162,40 @@ Falsifiable follow-ups, runnable in the harness:
    markets, not single names; if drawdown reduction vanished on indexes, that would
    weaken the one benefit we currently advertise.
 
+## 7. Walk-forward postscript: optimizing the MA lengths (2026-07-05, v0.10.0)
+
+§2's out-of-sample decay claim — that MA parameters which backtested best keep
+failing forward (Zakamulin's out-of-sample tests, Sullivan/Timmermann/White's
+data-snooping correction) — got its own harness test when the walk-forward
+machinery landed (`walkforward.js` + `wfma.js`). The experiment: every year,
+backtest all 8 classic SMA crossover pairs (fast 10/20/50 × slow 50/100/200) on
+the previous five years, pick the winner, trade it for the next unseen year,
+roll ~15 times, and score only the stitched test years — the honest version of
+"optimize the moving averages."
+
+**The selection step carries no information.** Across 270 pooled picks (18
+tickers × 15 folds), the training winner's rank on its own test year among the
+8 candidates averaged **4.67 of 8** — statistically indistinguishable from the
+no-information 4.50 (and on the *worse* side). It repeated as test-year winner
+9% of the time (chance: 12.5%). The picked pair's median training CAGR of 9.4%
+shrank to 1.8% realized, the median ticker cycled through 6 different "best"
+pairs in 15 folds, and the walk-forward record beat buy-and-hold on CAGR in
+**0/18** tickers (0/18 Sharpe, matched-shuffle percentile 19%). Sharpest of
+all: the yearly-re-picked rule lost to a plain, never-re-picked 50/200 golden
+cross in **14/18** tickers — the tuning is not merely useless, it costs money
+relative to not tuning. Every number is the same shape on total-return prices,
+with Sharpe-based selection, and with anchored (expanding) training windows
+(mean rank 4.44–4.70 across all four configurations). The hindsight-best pair
+per ticker "earned" a median 3.6pp more CAGR than the walk-forward record —
+that gap is the exact size of the illusion an in-sample optimizer sells.
+
+This closes the last loose thread of the MA topic from inside our own data:
+not only does the family's timing carry no information (§5), *choosing among
+the family's parameters* carries none either. The only reason the outcome
+still tracks the family's one honest virtue — 13/18 shallower drawdowns —
+is that every candidate in the space is a trend rule; that virtue never
+depended on which one you pick.
+
 ## References
 
 - Brock, W., Lakonishok, J. & LeBaron, B. (1992). "Simple Technical Trading Rules and

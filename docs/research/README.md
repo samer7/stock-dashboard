@@ -87,6 +87,14 @@ Queued topics (in order):
   falls from 74% to 58%). Below 50% means the rule's actual placement of its
   holding periods did slightly *worse* than random placements of the identical
   pattern — fully consistent with the flip-level finding above.
+  **Walk-forward postscript (2026-07-05, `wfma.js`): optimizing the MA lengths
+  adds nothing — measured out-of-sample.** Refit yearly from the prior 5y over
+  8 SMA crossover pairs, trade the winner forward, ~15 folds per ticker: the
+  training winner's test-year rank averaged 4.67/8 (no-information mean 4.50),
+  its 9.4% median training CAGR shrank to 1.8% realized, and the re-picked rule
+  lost to an untuned 50/200 golden cross in 14/18 tickers — tuning cost money.
+  0/18 vs buy-and-hold either way; robust to `--adjust`, Sharpe-selection, and
+  anchored windows. Full postscript in [ma-timing.md](ma-timing.md) §7.
 - **Momentum** — the most robust return anomaly in the academic literature
   (Jegadeesh & Titman 1993 and hundreds of follow-ups).
   **Digest: [momentum.md](momentum.md)** (2026-07-05, 13 verified citations):

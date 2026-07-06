@@ -42,7 +42,8 @@ Browser (index.html, GitHub Pages)
 - The RSI/MACD digest is written and reviewed (v0.9.9, `docs/research/rsi-macd.md`): both indicators are practitioner inventions the direct academic tests can't validate; MACD > 0 is literally an EMA12/26 crossover (the family the harness already closed), and RSI's reversal ancestor is dead in mega-caps.
 - The macdcross test ran (v0.9.10, `--strategy=macdcross`): verdict exactly as pre-committed — no timing information (1/18 CAGR total-return, hit rates = base rates, matched percentile 43%) on the heaviest trade counts yet, but the best crisis protection of any variant (18/18 COVID), completing the speed-vs-whipsaw spectrum. MACD stays descriptive; not in 5c scoring. Full verdict in `rsi-macd.md` §7.
 - The RSI(14) 30-recross event test ran (v0.9.11, `server/harness/rsievent.js`): the reversal hypothesis fails at its own horizons — 934 pooled recross events show 1-week returns at the 1st percentile of matched-random (worse than random days), 1-month at the 5th, identical on total-return, no subperiod bump. No tradable rule specced. **Both displayed indicators (RSI + MACD) are now tested end-to-end; both stay descriptive. The RSI/MACD topic is closed.** Full verdict in `rsi-macd.md` §8.
-- **Next planned tasks:** walk-forward machinery, then 5b–5e.
+- The **walk-forward machinery** is built (v0.10.0, `server/harness/walkforward.js`): fit sees only the training window, apply gets the full prefix for warmup, only stitched test segments are scored; sliding or anchored. Any FITTED signal from 5b/5c onward must pass through it. Its first experiment (`wfma.js`, yearly re-pick of the best SMA crossover pair from the prior 5y) measured the point: training winner's test rank 4.67/8 (chance 4.5), 0/18 vs buy-and-hold, **loses to an untuned 50/200 golden cross 14/18** — in-sample optimization demonstrated worthless on our own data, robust to --adjust/Sharpe-selection/anchored. Verdict in `ma-timing.md` §7. 5a machinery is complete; UI surfacing of harness results is the one 5a leftover.
+- **Next planned tasks:** 5b (probabilistic signals: calibrated probabilities, EWMA volatility, Brier/log-loss — fitted pieces go through walkforward.js), then 5c–5e.
 - Known limitations: Finnhub free-tier prices run ~2% off the official regular-session close (accuracy review deferred); congress data is House-only (Senate eFD deferred) and the first `/api/congress` call after a cold start is slow because it builds the disclosure index by reading many PDFs.
 
 ## Keys
@@ -70,7 +71,7 @@ When working on Phase 5/6, keep the owner-is-learning ethos: explain the math, p
 | `server/package.json` | Node dependencies (express, cors, dotenv, adm-zip, pdf-parse). |
 | `server/.env` | Real Finnhub API key. GITIGNORED. Never read aloud, never commit. |
 | `server/.env.example` | Template showing required env vars. Safe to commit. |
-| `server/harness/` | Phase 5a backtesting harness (standalone CLI, not served by Express): `data.js` (history fetch + disk cache + throttled loader), `strategies.js` (single-ticker signal rules — the MA rule MUST stay in sync with computeSignal in server.js), `backtest.js` (single-ticker simulator, baselines, horizons), `portfolio.js` (multi-ticker simulator core — alignment, rebalance-to-weights with costs on traded volume, EW benchmarks, random-picks baseline; Phase 6 reuses this engine), `momentum.js` (the 12-2 top-3 monthly experiment), `metrics.js`, `run.js` (CLI). Deterministic by design: frozen cache + seeded randomness. |
+| `server/harness/` | Phase 5a backtesting harness (standalone CLI, not served by Express): `data.js` (history fetch + disk cache + throttled loader), `strategies.js` (single-ticker signal rules — the MA rule MUST stay in sync with computeSignal in server.js; also `rsiSeries` in sync with rsi()), `backtest.js` (single-ticker simulator, baselines, horizons), `portfolio.js` (multi-ticker simulator core — alignment, rebalance-to-weights with costs on traded volume, EW benchmarks, random-picks baseline; Phase 6 reuses this engine), `walkforward.js` (out-of-sample split engine for fitted strategies — 5b/5c must use it), `momentum.js` / `rsievent.js` / `wfma.js` (the topic experiments), `metrics.js`, `run.js` (CLI). Deterministic by design: frozen cache + seeded randomness. |
 | `docs/research/` | Research-digest workstream: per-topic summaries of published quant-finance literature with citations, tied to harness results. |
 | `README.md` | Human-facing project overview and roadmap. |
 | `CHANGELOG.md` | Version history. |
@@ -103,6 +104,9 @@ node sweep.js AAPL MSFT KO    # custom basket
 node momentum.js              # portfolio mode: 12-2 relative momentum, top-3, monthly,
                               # vs equal-weight basket (--adjust, --cost=, --skip=0 for
                               # the 12-1 ablation, --top=)
+node rsievent.js              # RSI(14) 30-recross event test, pooled (--adjust)
+node wfma.js                  # walk-forward MA-pair selection experiment (--adjust,
+                              # --metric=sharpe, --train=5 --test=1, --anchored)
 ```
 
 Frontend: just open `index.html` in a browser. No build, no server needed for the frontend itself.
