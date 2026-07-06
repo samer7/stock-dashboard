@@ -145,6 +145,14 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
     tickers, simply because the rule keeps you out of the market about 42% of the time.
     So read <strong>BUY/SELL</strong> as a trend description and risk gauge
     ("historically reduced drawdowns, did not beat buy-and-hold") — not as trade advice.
+    RSI and MACD were tested the same way (as trading triggers, over the same ~19 years):
+    neither carries timing information either; they're shown as descriptions of the
+    current trend, nothing more.
+    <br><br>
+    <strong>The one forecast that measured well:</strong> "expected swing" is EWMA
+    volatility — how <em>bumpy</em> the next month is likely to be, not which way price
+    goes. In our backtests it ranked calm vs. wild months with 0.59 correlation and beat
+    naive baselines on 18 of 18 tickers; direction stayed unpredictable in every test.
   </div>
 
   <div id="detail-panel" style="display:none;"></div>
@@ -271,6 +279,7 @@ async function refreshSignal(ticker) {
   // showDetail() renders "—" when they're missing.
   STOCKS[ticker].rsi = (typeof data.rsi === 'number') ? data.rsi : null;
   STOCKS[ticker].macd = (data.macd && typeof data.macd.macd === 'number') ? data.macd : null;
+  STOCKS[ticker].volatility = (data.volatility && typeof data.volatility.monthPct === 'number') ? data.volatility : null;
   if (Array.isArray(data.sparkline) && data.sparkline.length) {
     sparkData[ticker] = data.sparkline; // real closes take over from the random walk
   }
@@ -561,6 +570,15 @@ function renderReportCard(ticker) {
     </div>`;
 }
 
+// Volatility: the one forward-looking number here that's measured to work —
+// EWMA-forecast bumpiness ranked calm vs wild months at 0.59 correlation in
+// our backtests (direction stays unpredictable; this is only about swing
+// size). Shown as a "typical month" ±band; ~2 months in 3 land inside it.
+function volTag(v) {
+  if (!v || typeof v.monthPct !== 'number') return { text: '—', color: '#aaa' };
+  return { text: `±${v.monthPct.toFixed(1)}% · typical month`, color: '#888' };
+}
+
 // Human labels for the House disclosure asset-type tags, per the official code
 // list at fd.house.gov/reference/asset-type-codes.aspx. [ST] stock is the
 // default and gets no label; anything else is called out so an RSU grant or
@@ -668,6 +686,7 @@ function showDetail(ticker) {
       <div class="metrics-row">
         <div class="metric"><div class="metric-label">RSI (14)</div><div class="metric-value" style="color:${rsiTag(d.rsi).color};">${esc(rsiTag(d.rsi).text)}</div></div>
         <div class="metric"><div class="metric-label">MACD (12/26/9)</div><div class="metric-value" style="color:${macdTag(d.macd).color};">${esc(macdTag(d.macd).text)}</div></div>
+        <div class="metric"><div class="metric-label">Expected swing (EWMA vol)</div><div class="metric-value" style="color:${volTag(d.volatility).color};">${esc(volTag(d.volatility).text)}</div></div>
       </div>
       <div class="section-label" style="margin-top:1rem;">Signal report card — how this signal actually performed here</div>
       ${renderReportCard(ticker)}

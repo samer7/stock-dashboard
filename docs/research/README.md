@@ -171,6 +171,22 @@ Queued topics (in order):
   gap.) Both displayed indicators are now tested end-to-end; both stay
   descriptive. Full verdict in [rsi-macd.md](rsi-macd.md) §8.
 
+- **Volatility forecasting** — the literature's one big exception to "nothing is
+  predictable," and Phase 5b's foundation.
+  **Digest: [volatility.md](volatility.md)** (2026-07-06, 7 citations): volatility
+  clusters (Mandelbrot 1963; Engle's Nobel-winning ARCH), is forecastable at
+  horizons up to ~1–2 months (Poon & Granger 2003, 93-paper survey), and simple
+  estimators compete well — so we use RiskMetrics EWMA (λ=0.94, published constant,
+  nothing fitted).
+  **Harness verdict (2026-07-06, `vol.js`): the project's FIRST POSITIVE result.**
+  Median rank correlation between EWMA forecast and realized next-21-day vol:
+  **0.59** (range 0.41–0.73; directional signals all scored ≈0). Beat climatology
+  and persistence baselines on MAE **18/18** each; decile calibration perfectly
+  monotonic (14.9% realized in the calmest forecast decile → 38.4% in the wildest).
+  Identical on total-return prices, insensitive to λ. Shipped as the detail panel's
+  "expected swing ±X%/month" — bumpiness only, never direction.
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
-[congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md).
+[congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),
+[volatility.md](volatility.md).
 Other entries land here as the topics are researched.

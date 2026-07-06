@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.11.0] - 2026-07-06
+### Added
+- **Phase 5b opens: EWMA volatility, measured then shipped.** New harness experiment (`server/harness/vol.js`): does RiskMetrics EWMA (λ=0.94, published constant, nothing fitted) forecast the next 21 days' realized volatility? Scored vs two baselines (expanding-window climatology, last-month persistence) with rank correlation and decile calibration
+- **`/api/history` returns `volatility`** (`ewmaVol` in server.js, math in sync with the harness): `annualPct` and `monthPct` (±1σ typical-month move) from the same ~250 closes it already fetches
+- **"Expected swing (EWMA vol)" in the detail panel** — "±X% · typical month" next to RSI/MACD, plus a legend paragraph saying exactly what it is (measured-to-work bumpiness) and is not (direction, which stayed unpredictable in every test)
+- **Volatility research digest** (`docs/research/volatility.md`, 7 citations): clustering since Mandelbrot 1963, ARCH/GARCH lineage, the Poon & Granger forecastability consensus, why plain EWMA over fitted GARCH, and pre-committed falsifiers (live band coverage, GARCH-via-walk-forward, horizon limits)
+
+### Measured
+- **The project's first positive result: volatility IS forecastable here.** Median rank correlation 0.59 between EWMA forecast and realized next-month vol (range 0.41–0.73 across 18 tickers; every directional signal scored ≈0); beats climatology 18/18 and persistence 18/18 on MAE; decile calibration monotonic from 14.9% (calmest forecast decile) to 38.4% (wildest). Identical on total-return prices; scoreboard unchanged at λ=0.90/0.97. Verified end-to-end in headless Chrome against the local backend
+
+---
+
 ## [0.10.2] - 2026-07-06
 ### Added
 - **Signal report card in the UI** — the detail panel now shows the dashboard's own measured backtest for its MA signal on that ticker: signal CAGR vs buy-and-hold CAGR, worst drawdown for both, trade count, and the matched-shuffle timing percentile, with a one-line honest reading (e.g. "underperformed buy-and-hold, but softened the worst crash"). Total-return prices, 0.1% cost/switch, ~19 years. Tickers outside the 18-name research basket say "not measured yet" instead of borrowing a number

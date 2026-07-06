@@ -331,6 +331,48 @@ function macd(closes, fast = 12, slow = 26, signalPeriod = 9) {
   };
 }
 
+// ---------- EWMA volatility ----------
+// "How bumpy will the next month likely be?" — the one forward-looking number
+// on this dashboard that's actually earned: price DIRECTION tested as
+// unpredictable in every harness experiment, but volatility clusters (calm
+// days follow calm days, wild follow wild), and our own measurement found
+// EWMA forecasts rank calm vs wild months at 0.59 correlation, beating both
+// naive baselines on 18/18 tickers (docs/research/volatility.md).
+//
+// The estimator is the RiskMetrics (1996) standard — an exponentially
+// weighted moving average of squared daily returns with lambda = 0.94:
+//     variance_today = 0.94 * variance_yesterday + 0.06 * todaysReturn^2
+// Nothing here is fitted to our data; lambda is a published constant.
+// Keep this in sync with ewmaVolSeries in server/harness/vol.js.
+//
+// `closes` is newest-first (like the other helpers); we reverse a copy to
+// walk oldest -> newest. Returns null if there isn't enough history to seed.
+function ewmaVol(closes, lambda = 0.94) {
+  const SEED_DAYS = 63; // seed the variance with one quarter of returns
+  if (closes.length < SEED_DAYS + 2) return null;
+  const chron = [...closes].reverse();
+
+  const returns = [];
+  for (let i = 1; i < chron.length; i++) returns.push(Math.log(chron[i] / chron[i - 1]));
+
+  let variance = 0;
+  for (let i = 0; i < SEED_DAYS; i++) variance += returns[i] * returns[i];
+  variance /= SEED_DAYS;
+  for (let i = SEED_DAYS; i < returns.length; i++) {
+    variance = lambda * variance + (1 - lambda) * returns[i] * returns[i];
+  }
+
+  const daily = Math.sqrt(variance);
+  return {
+    // Annualized vol, the number quoted in finance (daily * sqrt(252)).
+    annualPct: daily * Math.sqrt(252) * 100,
+    // A "typical month" move: +/- one standard deviation over ~21 trading
+    // days. About 2 months in 3 should land inside this band — it's a range
+    // of likely bumpiness, not a prediction of direction.
+    monthPct: daily * Math.sqrt(21) * 100,
+  };
+}
+
 // ---------- History + signal endpoint ----------
 // GET /api/history/:ticker
 // Fetches ~250 daily closes from Twelve Data, computes the moving averages and
@@ -383,6 +425,7 @@ app.get('/api/history/:ticker', async (req, res) => {
     // enough history; the frontend should treat null as "not available".
     const rsi14 = rsi(closes, 14);
     const macdData = macd(closes);
+    const vol = ewmaVol(closes);
 
     // 52-week high/low from the full ~year of daily data we already have.
     // Each day reports its own high and low; the 52w high is the highest of
@@ -416,6 +459,10 @@ app.get('/api/history/:ticker', async (req, res) => {
         macd: Number(macdData.macd.toFixed(2)),
         signal: Number(macdData.signal.toFixed(2)),
         histogram: Number(macdData.histogram.toFixed(2)),
+      },
+      volatility: vol === null ? null : {
+        annualPct: Number(vol.annualPct.toFixed(1)),
+        monthPct: Number(vol.monthPct.toFixed(1)),
       },
       sparkline,
     };
