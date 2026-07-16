@@ -4,6 +4,16 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.15.0] - 2026-07-15
+### Added
+- **Phase 5e: per-member congressional track records — measured with every pre-committed guardrail, shipped as transparency.** `server/harness/congressdata.js` fetches and parses ALL 5,849 digital House PTRs 2014–2026 (dual-format parser for the pre-2019 untagged PDFs, mixed-case small-caps tickers, option-keyword guard; member-name canonicalization that merges Clerk-index variants like "Marjorie Taylor Mrs Greene" without merging the two Dingells; amendment dedupe) → 43,430 trades, 256 members. `server/harness/congresstrack.js` scores them per `congressional-trading.md` §6: clock at DISCLOSURE date, excess vs SPY (total-return) at 1m/3m/6m/12m, equal weight, ≥20-buys display gate, per-member percentile vs 1,000 matched-random portfolios (same tickers, random dates, seeded), best-of-N reality check, split-sample test
+- **Member records in the UI**: a grey "Measured:" line under a member's name in the activity feed and per-ticker congress lists (6m excess vs SPY, n, luck percentile), a pooled-verdict footer, coverage caveats. Generated constant via `congresstrack.js --export`
+
+### Measured
+- **The post-2012 literature null, reproduced end-to-end.** Pooled disclosed buys: +1.20% vs SPY at 6m (n=7,272 scored buys, 50% hit rate — a coin), against Belmont et al.'s −0.26%; the modest positive is explained by priced-universe survivorship (34% of trades scoreable — the most-traded large-cap slice; delisted losers drop out), stated in the UI. Per-member: 77 qualify, 7 beat the 95th luck percentile (chance predicts ~4), and the best-of-N check fails decisively — the top record (+19.1%, n=31) sits at the 93rd percentile of the best-of-77-random distribution. Split-sample: 2 top-decile members stay positive out-of-sample but neither clears their full-sample random baseline. **No skill claim licensed; no member is endorsed; the feature is honest measurement of public disclosures**
+
+---
+
 ## [0.14.0] - 2026-07-15
 ### Added
 - **Phase 5d closed: volatility-targeted sizing — the project's second measured-positive result, and its first that's a strategy rather than a forecast.** New harness experiment (`server/harness/voltarget.js`): hold `w = min(1, normal vol / forecast vol)` of the stock — "normal" being the expanding median of the ticker's own EWMA vol series, forecast being the same λ=0.94 EWMA already shipped in the UI — long-only, no leverage, 5pp rebalance band, 0.1% cost on traded volume, nothing fitted, next-day information discipline, ship rule pre-committed in the header. Benchmarked against buy-and-hold AND a matched constant-exposure control (the strategy's own average weight held constant), so the timing of the de-risking is isolated from the mere fact of holding cash

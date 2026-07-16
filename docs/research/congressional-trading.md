@@ -144,7 +144,34 @@ Design guidance, all testable in the existing harness (daily closes, ~20y/ticker
    number is the robust, literature-comparable statistic (Belmont et al. predict
    roughly −0.3%); per-member rows are the transparency layer beneath it.
 
-## 7. What would change our mind
+## 7. Harness verdict (2026-07-15, `congresstrack.js` — Phase 5e measured)
+
+The §6 design ran as specced: 43,430 deduped trades parsed from all 5,849 digital
+House PTRs 2014–2026 (`congressdata.js`; dual-format parser, name-variant
+canonicalization, amendment dedupe), 14,762 scored (34% — priced coverage is the
+~200 most-traded tickers; the rest are mostly delisted/fund symbols, counted and
+disclosed in the UI). Clock at disclosure date, excess vs SPY, equal weight.
+
+- **Pooled: +1.20% vs SPY at 6m (n=7,272), 50% hit rate.** Sells +0.15%. Modestly
+  above Belmont et al.'s −0.26%, with two honest deflators: the priced universe is
+  the most-traded (large-cap, survivor-tilted) slice, and delisted losers drop out.
+  A coin-flip hit rate either way: no exploitable aggregate signal.
+- **Per-member: 77 members clear the 20-buy minimum; 7 score ≥95th percentile
+  against their own matched-random baseline (chance predicts ~4).** The best-of-N
+  reality check settles it: the leaderboard's top record (+19.1% at 6m, n=31) sits
+  at the **93rd percentile of the best-of-77-random distribution** — below the bar.
+  With 77 records ranked, luck alone routinely manufactures a +14% "star."
+- **Split-sample: 13 members qualify (≥20 scored buys in each half); the in-sample
+  top decile (2 members) stayed positive out-of-sample** (+8.0%→+5.2%, +5.3%→+2.8%)
+  but neither cleared their random baseline over the full sample (95th and 14th
+  percentile respectively) — suggestive at most, and exactly what a few lucky
+  survivors among 77 should produce.
+- **Verdict: no skill claim is licensed; the transparency feature ships.** Every
+  displayed record carries its luck percentile and the 20-buy gate; the pooled line
+  and coverage caveats ship with it. This is the literature's post-2012 null,
+  reproduced on our own pipeline.
+
+## 8. What would change our mind
 
 - **Pooled disclosed buys beating SPY at 6–12m** in our data, out-of-sample and past
   the matched-random baseline, would contradict Belmont et al. — worth a very
