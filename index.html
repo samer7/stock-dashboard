@@ -162,6 +162,12 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
     walk-forward regression: worse than the base rate on all 18 tickers at every
     horizon — the components carry no timing information for weights to find. That's
     why there is no combined "score" on this dashboard.
+    The volatility forecast did pass one more test — <em>sizing</em>: holding less of a
+    stock whenever its forecast swing ran above its own norm (and never guessing
+    direction) cut the worst peak-to-trough drop on 18 of 18 backtested tickers and
+    improved return-per-risk on most, at the price of a lower raw return. That measured
+    trade-off is the "sizing by calm vs. storm" line in the report card — risk
+    arithmetic, not advice.
   </div>
 
   <div id="detail-panel" style="display:none;"></div>
@@ -527,28 +533,52 @@ function macdTag(m) {
 // probability row because prob.js measured them as the BEST probability we
 // can produce — layering the EWMA vol forecast on top scored worse at every
 // horizon (docs/research/calibration.md).
+// `vt` = vol-targeted sizing, the spec measured POSITIVE by voltarget.js
+// (docs/research/risk-sizing.md §5): `target` is this ticker's normal
+// typical-month swing (median EWMA vol, ±%); the frontend divides it by the
+// live forecast to state today's implied exposure. `sharpe`/`dd` vs
+// `bhSharpe`/`bhDD` are the measured pair for that sizing rule vs holding
+// full, same window and costs.
 const HARNESS_RESULTS = {
-  generated: '2026-07-11',
+  generated: '2026-07-16',
   config: 'total-return prices, 0.1% cost/switch, next-day execution',
   tickers: {
-    SPY:   { years: 19.1, stratCagr: 3.7,   bhCagr: 10.6,  stratDD: -29.9,  bhDD: -55.2,  matchedPct: 18,  trades: 217,  odds: { '1w': 60, '1m': 67, '3m': 73, '1y': 82 } },
-    QQQ:   { years: 19.1, stratCagr: 8.6,   bhCagr: 16,    stratDD: -21.8,  bhDD: -53.6,  matchedPct: 40,  trades: 197,  odds: { '1w': 60, '1m': 67, '3m': 74, '1y': 86 } },
-    IWM:   { years: 19.1, stratCagr: 0.2,   bhCagr: 8.3,   stratDD: -35,    bhDD: -58.6,  matchedPct: 13,  trades: 231,  odds: { '1w': 56, '1m': 60, '3m': 65, '1y': 69 } },
-    AAPL:  { years: 19.1, stratCagr: 13.6,  bhCagr: 26.2,  stratDD: -36.5,  bhDD: -60.9,  matchedPct: 52,  trades: 192,  odds: { '1w': 58, '1m': 63, '3m': 71, '1y': 81 } },
-    MSFT:  { years: 19.1, stratCagr: 5.5,   bhCagr: 15.5,  stratDD: -29.7,  bhDD: -59.1,  matchedPct: 27,  trades: 212,  odds: { '1w': 57, '1m': 61, '3m': 65, '1y': 77 } },
-    NVDA:  { years: 19.1, stratCagr: 24.7,  bhCagr: 36.2,  stratDD: -56.2,  bhDD: -85.1,  matchedPct: 86,  trades: 198,  odds: { '1w': 56, '1m': 61, '3m': 68, '1y': 75 } },
-    GOOGL: { years: 19.1, stratCagr: 12.9,  bhCagr: 19.2,  stratDD: -41.7,  bhDD: -65.3,  matchedPct: 82,  trades: 176,  odds: { '1w': 57, '1m': 61, '3m': 65, '1y': 79 } },
-    AMZN:  { years: 19.1, stratCagr: 7.5,   bhCagr: 24.9,  stratDD: -53.6,  bhDD: -65.3,  matchedPct: 12,  trades: 182,  odds: { '1w': 56, '1m': 63, '3m': 67, '1y': 84 } },
-    KO:    { years: 19.1, stratCagr: 1.2,   bhCagr: 9.6,   stratDD: -26.3,  bhDD: -40.6,  matchedPct: 6,   trades: 223,  odds: { '1w': 55, '1m': 60, '3m': 66, '1y': 81 } },
-    PG:    { years: 19.1, stratCagr: 0.1,   bhCagr: 7.7,   stratDD: -30.7,  bhDD: -39,    matchedPct: 7,   trades: 221,  odds: { '1w': 56, '1m': 57, '3m': 62, '1y': 77 } },
-    JNJ:   { years: 19.1, stratCagr: 3.3,   bhCagr: 10.9,  stratDD: -24.1,  bhDD: -34.4,  matchedPct: 19,  trades: 219,  odds: { '1w': 55, '1m': 58, '3m': 64, '1y': 77 } },
-    JPM:   { years: 19.1, stratCagr: 1.8,   bhCagr: 13.1,  stratDD: -61.9,  bhDD: -67.7,  matchedPct: 12,  trades: 201,  odds: { '1w': 56, '1m': 60, '3m': 66, '1y': 69 } },
-    XOM:   { years: 19.1, stratCagr: 0.4,   bhCagr: 6.2,   stratDD: -47.8,  bhDD: -62.1,  matchedPct: 29,  trades: 194,  odds: { '1w': 54, '1m': 56, '3m': 56, '1y': 63 } },
-    INTC:  { years: 19.1, stratCagr: 4.6,   bhCagr: 11.1,  stratDD: -67.6,  bhDD: -70.8,  matchedPct: 52,  trades: 179,  odds: { '1w': 53, '1m': 57, '3m': 57, '1y': 63 } },
-    T:     { years: 19.1, stratCagr: -0.1,  bhCagr: 3.5,   stratDD: -45.8,  bhDD: -45.6,  matchedPct: 35,  trades: 192,  odds: { '1w': 53, '1m': 55, '3m': 59, '1y': 63 } },
-    F:     { years: 19.1, stratCagr: 3.1,   bhCagr: 5.9,   stratDD: -68,    bhDD: -86.9,  matchedPct: 60,  trades: 176,  odds: { '1w': 51, '1m': 53, '3m': 52, '1y': 49 } },
-    BA:    { years: 19.1, stratCagr: 4,     bhCagr: 6.2,   stratDD: -46.2,  bhDD: -77.9,  matchedPct: 70,  trades: 188,  odds: { '1w': 54, '1m': 56, '3m': 58, '1y': 64 } },
-    PFE:   { years: 19.1, stratCagr: -2,    bhCagr: 4,     stratDD: -46.8,  bhDD: -59,    matchedPct: 13,  trades: 206,  odds: { '1w': 52, '1m': 54, '3m': 57, '1y': 63 } },
+    SPY:   { years: 19.1, stratCagr: 3.7,   bhCagr: 10.6,  stratDD: -29.9,  bhDD: -55.2,  matchedPct: 18,  trades: 217,  odds: { '1w': 60, '1m': 67, '3m': 73, '1y': 82 },
+            vt: { target: 3.9,   sharpe: 0.78,  bhSharpe: 0.63,  dd: -35.1,  bhDD: -55.2 } },
+    QQQ:   { years: 19.1, stratCagr: 8.6,   bhCagr: 16,    stratDD: -21.8,  bhDD: -53.6,  matchedPct: 40,  trades: 197,  odds: { '1w': 60, '1m': 67, '3m': 74, '1y': 86 },
+            vt: { target: 4.9,   sharpe: 0.92,  bhSharpe: 0.79,  dd: -35.2,  bhDD: -53.6 } },
+    IWM:   { years: 19.1, stratCagr: 0.2,   bhCagr: 8.3,   stratDD: -35,    bhDD: -58.6,  matchedPct: 13,  trades: 231,  odds: { '1w': 56, '1m': 60, '3m': 65, '1y': 69 },
+            vt: { target: 5.5,   sharpe: 0.51,  bhSharpe: 0.46,  dd: -36.7,  bhDD: -58.4 } },
+    AAPL:  { years: 19.1, stratCagr: 13.6,  bhCagr: 26.2,  stratDD: -36.5,  bhDD: -60.9,  matchedPct: 52,  trades: 192,  odds: { '1w': 58, '1m': 63, '3m': 71, '1y': 81 },
+            vt: { target: 7.4,   sharpe: 1,     bhSharpe: 0.91,  dd: -48.6,  bhDD: -60.9 } },
+    MSFT:  { years: 19.1, stratCagr: 5.5,   bhCagr: 15.5,  stratDD: -29.7,  bhDD: -59.1,  matchedPct: 27,  trades: 212,  odds: { '1w': 57, '1m': 61, '3m': 65, '1y': 77 },
+            vt: { target: 6.4,   sharpe: 0.78,  bhSharpe: 0.67,  dd: -35.4,  bhDD: -59.1 } },
+    NVDA:  { years: 19.1, stratCagr: 24.7,  bhCagr: 36.2,  stratDD: -56.2,  bhDD: -85.1,  matchedPct: 86,  trades: 198,  odds: { '1w': 56, '1m': 61, '3m': 68, '1y': 75 },
+            vt: { target: 11.7,  sharpe: 0.91,  bhSharpe: 0.85,  dd: -73.6,  bhDD: -85.1 } },
+    GOOGL: { years: 19.1, stratCagr: 12.9,  bhCagr: 19.2,  stratDD: -41.7,  bhDD: -65.3,  matchedPct: 82,  trades: 176,  odds: { '1w': 57, '1m': 61, '3m': 65, '1y': 79 },
+            vt: { target: 7.2,   sharpe: 0.86,  bhSharpe: 0.74,  dd: -48.1,  bhDD: -65.3 } },
+    AMZN:  { years: 19.1, stratCagr: 7.5,   bhCagr: 24.9,  stratDD: -53.6,  bhDD: -65.3,  matchedPct: 12,  trades: 182,  odds: { '1w': 56, '1m': 63, '3m': 67, '1y': 84 },
+            vt: { target: 8.9,   sharpe: 0.85,  bhSharpe: 0.78,  dd: -46.5,  bhDD: -65.3 } },
+    KO:    { years: 19.1, stratCagr: 1.2,   bhCagr: 9.6,   stratDD: -26.3,  bhDD: -40.6,  matchedPct: 6,   trades: 223,  odds: { '1w': 55, '1m': 60, '3m': 66, '1y': 81 },
+            vt: { target: 4.3,   sharpe: 0.65,  bhSharpe: 0.57,  dd: -24.7,  bhDD: -40.6 } },
+    PG:    { years: 19.1, stratCagr: 0.1,   bhCagr: 7.7,   stratDD: -30.7,  bhDD: -39,    matchedPct: 7,   trades: 221,  odds: { '1w': 56, '1m': 57, '3m': 62, '1y': 77 },
+            vt: { target: 4.3,   sharpe: 0.48,  bhSharpe: 0.48,  dd: -24.7,  bhDD: -39 } },
+    JNJ:   { years: 19.1, stratCagr: 3.3,   bhCagr: 10.9,  stratDD: -24.1,  bhDD: -34.4,  matchedPct: 19,  trades: 219,  odds: { '1w': 55, '1m': 58, '3m': 64, '1y': 77 },
+            vt: { target: 4.1,   sharpe: 0.71,  bhSharpe: 0.68,  dd: -18.3,  bhDD: -34.4 } },
+    JPM:   { years: 19.1, stratCagr: 1.8,   bhCagr: 13.1,  stratDD: -61.9,  bhDD: -67.7,  matchedPct: 12,  trades: 201,  odds: { '1w': 56, '1m': 60, '3m': 66, '1y': 69 },
+            vt: { target: 6.6,   sharpe: 0.66,  bhSharpe: 0.53,  dd: -34.1,  bhDD: -67.7 } },
+    XOM:   { years: 19.1, stratCagr: 0.4,   bhCagr: 6.2,   stratDD: -47.8,  bhDD: -62.1,  matchedPct: 29,  trades: 194,  odds: { '1w': 54, '1m': 56, '3m': 56, '1y': 63 },
+            vt: { target: 5.9,   sharpe: 0.28,  bhSharpe: 0.36,  dd: -50.2,  bhDD: -62.1 } },
+    INTC:  { years: 19.1, stratCagr: 4.6,   bhCagr: 11.1,  stratDD: -67.6,  bhDD: -70.8,  matchedPct: 52,  trades: 179,  odds: { '1w': 53, '1m': 57, '3m': 57, '1y': 63 },
+            vt: { target: 8.2,   sharpe: 0.39,  bhSharpe: 0.46,  dd: -59.6,  bhDD: -70.8 } },
+    T:     { years: 19.1, stratCagr: -0.1,  bhCagr: 3.5,   stratDD: -45.8,  bhDD: -45.6,  matchedPct: 35,  trades: 192,  odds: { '1w': 53, '1m': 55, '3m': 59, '1y': 63 },
+            vt: { target: 5.3,   sharpe: 0.28,  bhSharpe: 0.27,  dd: -36.8,  bhDD: -45.6 } },
+    F:     { years: 19.1, stratCagr: 3.1,   bhCagr: 5.9,   stratDD: -68,    bhDD: -86.9,  matchedPct: 60,  trades: 176,  odds: { '1w': 51, '1m': 53, '3m': 52, '1y': 49 },
+            vt: { target: 8.9,   sharpe: 0.36,  bhSharpe: 0.35,  dd: -57.9,  bhDD: -86.3 } },
+    BA:    { years: 19.1, stratCagr: 4,     bhCagr: 6.2,   stratDD: -46.2,  bhDD: -77.9,  matchedPct: 70,  trades: 188,  odds: { '1w': 54, '1m': 56, '3m': 58, '1y': 64 },
+            vt: { target: 7.9,   sharpe: 0.39,  bhSharpe: 0.35,  dd: -57,    bhDD: -77.9 } },
+    PFE:   { years: 19.1, stratCagr: -2,    bhCagr: 4,     stratDD: -46.8,  bhDD: -59,    matchedPct: 13,  trades: 206,  odds: { '1w': 52, '1m': 54, '3m': 57, '1y': 63 },
+            vt: { target: 5.7,   sharpe: 0.32,  bhSharpe: 0.31,  dd: -51.5,  bhDD: -59 } },
   },
 };
 
@@ -586,11 +616,36 @@ function renderReportCard(ticker) {
       the best probability we can offer: every model we tested (including our own volatility
       forecast) made these odds worse, not better.
     </div>` : ''}
+    ${r.vt ? renderVolSizing(ticker, r.vt) : ''}
     <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.5;">
       ${summary}<br>
       ${r.years} years of daily data, ${HARNESS_RESULTS.config}, ${r.trades} trades.
       Timing vs. random placements of the same holding pattern: ${ordinal(r.matchedPct)} percentile (50% = luck).
       Measured ${HARNESS_RESULTS.generated} by the project's open backtest harness — past performance, not a forecast.
+    </div>`;
+}
+
+// Vol-targeted sizing row for the report card — the Phase 5d measured-positive
+// result (docs/research/risk-sizing.md §5): hold less of a stock when its
+// forecast swing runs above its own historical norm. `vt.target` (the norm)
+// and the backtest pair are frozen harness numbers; the implied exposure is
+// computed live from the same EWMA forecast the "expected swing" tile shows.
+// Deliberately framed as risk arithmetic, never direction and never advice —
+// the rule's whole point is that it works WITHOUT predicting which way.
+function renderVolSizing(ticker, vt) {
+  const live = STOCKS[ticker] && STOCKS[ticker].volatility;
+  const nowText = (live && typeof live.monthPct === 'number')
+    ? ` Current forecast: ±${live.monthPct.toFixed(1)}% → vol-scaled exposure today ~${Math.round(Math.min(1, vt.target / live.monthPct) * 100)}%.`
+    : '';
+  return `<div style="font-size:12px;color:#555;margin-top:8px;">
+      Sizing by calm vs. storm (measured to work): this stock's normal month is
+      <strong>±${vt.target}%</strong>.${nowText}
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:2px;line-height:1.5;">
+      Holding less whenever the forecast swing ran above that norm — never predicting direction —
+      changed the worst drop to <strong>${vt.dd}%</strong> (vs ${vt.bhDD}% holding full) and
+      return-per-risk (Sharpe) to <strong>${vt.sharpe}</strong> (vs ${vt.bhSharpe}) over ~19 years,
+      total-return, costs included. A risk illustration, not advice.
     </div>`;
 }
 

@@ -53,6 +53,33 @@ function simulate(closes, positions, { costRate = 0.001, startValue = 10_000 } =
   return { values, trades };
 }
 
+// Fractional-exposure version of simulate(): weights[i] in [0, 1] is the
+// FRACTION of the portfolio riding the stock during day i (the rest sits in
+// cash). Generalizes the binary simulator — an all-0/1 weights array
+// reproduces simulate() exactly, including its cost model, because costs
+// here are charged on TRADED VOLUME: changing exposure by |Δw| of the
+// portfolio costs |Δw| * costRate (a full 0→1 switch pays the whole
+// costRate, a 0.60→0.65 trim pays a twentieth of it). Same convention as
+// portfolio.js. `trades` counts the days a rebalance happened; `turnover`
+// sums |Δw| so callers can report traded volume per year.
+function simulateWeights(closes, weights, { costRate = 0.001, startValue = 10_000 } = {}) {
+  const values = new Array(closes.length).fill(0);
+  values[0] = startValue;
+  let trades = 0, turnover = 0;
+  for (let i = 1; i < closes.length; i++) {
+    let v = values[i - 1];
+    v *= 1 + weights[i] * (closes[i] / closes[i - 1] - 1);
+    const dw = Math.abs(weights[i] - weights[i - 1]);
+    if (dw > 1e-12) {
+      v *= 1 - costRate * dw;
+      trades++;
+      turnover += dw;
+    }
+    values[i] = v;
+  }
+  return { values, trades, turnover };
+}
+
 // Buy-and-hold over the same days: buy on day 0 (one cost), never touch it.
 // This is the benchmark that matters most — it's what a person who ignores
 // the dashboard entirely would get.
@@ -294,4 +321,4 @@ function mulberry32(seed) {
   };
 }
 
-module.exports = { signalsToPositions, simulate, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats, mulberry32, HORIZONS, CRISIS_WINDOWS };
+module.exports = { signalsToPositions, simulate, simulateWeights, buyAndHold, randomBaseline, randomBaselineMatched, percentileOf, horizonStats, transitionStats, crisisStats, mulberry32, HORIZONS, CRISIS_WINDOWS };

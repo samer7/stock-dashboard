@@ -46,6 +46,33 @@ function sharpe(values) {
   return (mean / std) * Math.sqrt(TRADING_DAYS_PER_YEAR);
 }
 
+// Sortino ratio: like Sharpe, but the denominator only counts DOWNSIDE
+// volatility — the root-mean-square of the negative daily returns (positive
+// days contribute zero). Rationale: volatility that surprises you upward
+// isn't risk anyone minds. Same conventions as sharpe() above: daily
+// returns, annualized by sqrt(252), 0% risk-free/target rate. Note the
+// downside sum is still divided by ALL days (the standard convention), so a
+// strategy with rare small losses gets a small denominator, not a biased one.
+function sortino(values) {
+  const rets = dailyReturns(values);
+  if (rets.length === 0) return 0;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const downsideVar = rets.reduce((a, b) => a + (b < 0 ? b * b : 0), 0) / rets.length;
+  const downside = Math.sqrt(downsideVar);
+  if (downside === 0) return 0;
+  return (mean / downside) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
+// Annualized volatility of the daily returns — the risk number on its own,
+// for reports that compare "how bumpy was the ride" directly.
+function annualVol(values) {
+  const rets = dailyReturns(values);
+  if (rets.length === 0) return 0;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length;
+  return Math.sqrt(variance) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
 // Maximum drawdown: the worst peak-to-trough fall, as a fraction of the peak.
 // This is the "how much pain would I have sat through?" number — many people
 // abandon a strategy (or the market) during a deep drawdown, which is why a
@@ -61,4 +88,4 @@ function maxDrawdown(values) {
   return worst; // e.g. -0.34 means a 34% fall from the peak at the worst point
 }
 
-module.exports = { dailyReturns, totalReturn, cagr, sharpe, maxDrawdown, TRADING_DAYS_PER_YEAR };
+module.exports = { dailyReturns, totalReturn, cagr, sharpe, sortino, annualVol, maxDrawdown, TRADING_DAYS_PER_YEAR };

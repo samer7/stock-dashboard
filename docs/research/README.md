@@ -231,8 +231,31 @@ Queued topics (in order):
   out-of-sample. Per the pre-committed ship rule, **no weighted score ships**; the
   legend records the null. **Phase 5c is closed.**
 
+- **Risk & sizing** — Phase 5d: honest risk reporting (Sharpe/Sortino/drawdown) and
+  the one use of a vol forecast that needs no direction call: position sizing.
+  **Digest: [risk-sizing.md](risk-sizing.md)** (2026-07-15, 10 citations): Kelly
+  (1956) as a risk *ceiling* (edge/variance — and our measured edge is base-rate
+  drift only), fractional-Kelly practice (MacLean-Thorp-Ziemba 2010; Samuelson's
+  1979 caveat), Sortino's downside-only denominator, and volatility targeting —
+  Moreira & Muir (2017) for the Sharpe claim, Harvey et al. (2018) for tail-taming,
+  Cederburg et al. (2020) for the fragility warning.
+  **Harness verdict (2026-07-15, `voltarget.js`): the ship rule PASSES — the
+  project's second measured-positive result, and its first strategy-shaped one.**
+  w = min(1, median EWMA vol / current EWMA vol), long-only, no leverage, nothing
+  fitted: Sharpe beats the matched constant-exposure control (same average
+  exposure, so timing is isolated) **12/18 plain, 16/18 total-return** (median 0.66
+  vs 0.57); max drawdown shallower than buy-and-hold **18/18 on both price sets**
+  (median −37% vs −59%); crisis windows 18/17/15 of 18. Robust to power/band/λ/cost
+  ablations (Sharpe majority 11–16/18 in all). Honest cost: ~2.4pp/yr of raw CAGR
+  at ~85% average exposure; laggards (XOM, INTC, PG, T) are the rebound-heavy
+  tickers, the `calibration.md` effect collecting its due. Shipped: per-ticker
+  "sizing by calm vs. storm" line in the report card (frozen target + measured
+  pair, live implied exposure), labeled risk illustration, never advice. Phase 6's
+  forward test gets the final word (Cederburg's warning stands). **Phase 5d is
+  closed.**
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),
 [volatility.md](volatility.md), [calibration.md](calibration.md),
-[multi-signal.md](multi-signal.md).
+[multi-signal.md](multi-signal.md), [risk-sizing.md](risk-sizing.md).
 Other entries land here as the topics are researched.
