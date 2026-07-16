@@ -186,7 +186,29 @@ Queued topics (in order):
   Identical on total-return prices, insensitive to λ. Shipped as the detail panel's
   "expected swing ±X%/month" — bumpiness only, never direction.
 
+- **Probability calibration** — Phase 5b proper: can the dashboard state honest
+  up/down probabilities, and can the measured vol forecast sharpen them?
+  **Digest: [calibration.md](calibration.md)** (2026-07-11, 6 citations): proper
+  scoring rules from weather forecasting (Brier 1950; Gneiting & Raftery 2007),
+  skill measured against climatology — the base rate — per Murphy (1973), and the
+  one live hypothesis: Christoffersen & Diebold (2006) show sign forecastability
+  can be inherited from vol dynamics via P(up) = Φ(drift/vol).
+  **Harness verdict (2026-07-11, `prob.js`): the base rate wins; the vol layer is
+  out.** Pre-committed test, 18 tickers × 4 horizons, ~4,200 forecast days each:
+  the drift-over-EWMA-vol model beat expanding-window climatology on Brier in
+  **1/18 (1w), 0/18 (1m), 2/18 (3m), 8/18 (1y)** — same on log-loss and on
+  total-return prices — while climatology itself beat the coin 15/14/13 of 18 at
+  1w/1m/3m. The calibration table localizes the failure: whenever high vol pushed
+  the model's P(up) below 50%, prices actually rose 56–79% of the time — crash
+  bottoms are rebound moments, so vol-shrinking toward 50% fires backwards. The
+  Gaussian ablation with full-history vol *also* lost to plain counting (2/18):
+  left-skewed fat-tailed returns make the formula understate up-rates. What ships
+  is the measured winner, labeled honestly: per-ticker base-rate odds at each
+  horizon in the UI report card. **Phase 5b is closed**; a fitted probability
+  model (logit on vol/skew via `walkforward.js`) is the documented
+  would-change-our-mind follow-up.
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),
-[volatility.md](volatility.md).
+[volatility.md](volatility.md), [calibration.md](calibration.md).
 Other entries land here as the topics are researched.

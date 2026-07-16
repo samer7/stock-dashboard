@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.12.0] - 2026-07-11
+### Added
+- **Phase 5b closed: up/down probabilities measured, base rates ship.** New harness experiment (`server/harness/prob.js`): four deterministic forecasters of P(higher in 1w/1m/3m/1y) — coin, expanding-window climatology (the base rate), and the Christoffersen–Diebold drift-over-vol model with full-history vol (ablation) and with the EWMA vol layer (candidate) — scored with proper scoring rules (Brier, log-loss) plus pooled calibration tables, with the ship rule pre-committed in the script header before the first run
+- **"Odds of being higher" row in the signal report card** — each measured ticker's detail panel now shows its historical base rate of ending higher at 1w/1m/3m/1y (total-return, ~19y), labeled "what usually happened, not a forecast of this moment," with the measured note that every model tested made these odds worse. Legend expander explains why the vol forecast stays direction-free
+- **`export.js` computes the odds** from the same frozen cache and now prints in the exact shape of index.html's constant (one aligned line per ticker), so regenerate-and-paste stays a clean diff
+- **Probability-calibration research digest** (`docs/research/calibration.md`, 6 citations): proper scoring rules (Brier 1950; Gneiting & Raftery 2007), skill vs climatology (Murphy 1973), the tested Christoffersen & Diebold (2006) hypothesis, and pre-committed falsifiers (a fitted logit via walkforward.js, base-rate drift in Phase 6)
+- `vol.js` helpers (`logReturns`, `ewmaVolSeries`) are now exported and its CLI guarded with `require.main`, so `prob.js` reuses the same math instead of duplicating it
+
+### Measured
+- **The vol layer does NOT improve direction probabilities — the base rate is the best probability we can offer.** The candidate beat climatology on Brier in 1/18 (1w), 0/18 (1m), 2/18 (3m), 8/18 (1y) tickers; identical verdict on log-loss and on total-return prices; median BSS −0.2% to −2.3%. Climatology itself beat the coin 15/14/13 of 18 at 1w/1m/3m (17/16/14 total-return). Failure mode localized by the calibration table: when high vol pushed stated P(up) under 50%, prices actually rose 56–79% of the time — turbulence marks rebounds, so shrinking toward 50% in storms is directionally backwards. Per the pre-committed rule, the vol layer stays out; verified end-to-end in headless Chrome (measured ticker shows odds row, unmeasured shows honest fallback, no console errors)
+
+---
+
 ## [0.11.0] - 2026-07-06
 ### Added
 - **Phase 5b opens: EWMA volatility, measured then shipped.** New harness experiment (`server/harness/vol.js`): does RiskMetrics EWMA (λ=0.94, published constant, nothing fitted) forecast the next 21 days' realized volatility? Scored vs two baselines (expanding-window climatology, last-month persistence) with rank correlation and decile calibration

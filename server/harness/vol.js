@@ -230,4 +230,10 @@ async function main() {
   console.log(`    the price goes — that question scored zero in every test this project has run.`);
 }
 
-main().catch(err => { console.error(err.message); process.exit(1); });
+// Run the CLI only when invoked directly (`node vol.js`); prob.js requires
+// this file just for the helper functions below.
+if (require.main === module) {
+  main().catch(err => { console.error(err.message); process.exit(1); });
+}
+
+module.exports = { logReturns, ewmaVolSeries, realizedVol, spearman, DEFAULT_BASKET };
