@@ -208,7 +208,31 @@ Queued topics (in order):
   model (logit on vol/skew via `walkforward.js`) is the documented
   would-change-our-mind follow-up.
 
+- **Multi-signal combination** — Phase 5c: do *fitted weights* over the dashboard's
+  signals (MA state, RSI, MACD, EWMA vol) produce probabilities better than base
+  rates?
+  **Digest: [multi-signal.md](multi-signal.md)** (2026-07-15, 8 citations):
+  combination helps only when components carry independent information (Bates &
+  Granger 1969); estimated weights usually lose to naive ones (Timmermann 2006 —
+  the "combination puzzle"); equity-premium predictors die out-of-sample (Welch &
+  Goyal 2008; Campbell & Thompson 2008); what survives is shrinkage, not selection
+  (Rapach-Strauss-Zhou 2010); ML gains live in small caps, not our mega-cap basket
+  (Gu-Kelly-Xiu 2020); and best-of-N testing manufactures fake edges (White 2000;
+  Sullivan-Timmermann-White 1999) — so 5c tested exactly ONE pre-committed spec.
+  **Harness verdict (2026-07-15, `combo.js`): the combination fails everywhere —
+  0/18 tickers beat climatology on Brier at 1w, 1m, AND 3m**, identical on
+  total-return prices and log-loss (median BSS −1.2%/−4.2%/−10.2%; 15 walk-forward
+  folds and ~3,700 out-of-sample days per ticker). The failure's shape is pure
+  overfitting: damage grows with horizon, shrinks as the ridge tightens (α 0.001 →
+  0.1 moves median 3m BSS from −10.7% to −5.9%; the best model is the one shrunk
+  back to climatology), and across 270 fits per horizon no feature reaches better
+  than 65% sign agreement. The calibration.md §5 follow-up is answered: a fitted
+  vol weight leans positive at 3m (the rebound sign) but buys nothing
+  out-of-sample. Per the pre-committed ship rule, **no weighted score ships**; the
+  legend records the null. **Phase 5c is closed.**
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),
-[volatility.md](volatility.md), [calibration.md](calibration.md).
+[volatility.md](volatility.md), [calibration.md](calibration.md),
+[multi-signal.md](multi-signal.md).
 Other entries land here as the topics are researched.

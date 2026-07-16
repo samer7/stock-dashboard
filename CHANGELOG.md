@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.13.0] - 2026-07-15
+### Added
+- **Phase 5c closed: the weighted multi-signal model was measured and declined.** New harness experiment (`server/harness/combo.js`): ridge-regularized logistic regression from the dashboard's four signals (MA state, RSI(14), MACD cross, ln EWMA vol — standardized per fold) to P(higher in 1w/1m/3m), with every weight fitted strictly inside `walkforward.js` training windows (5y/1y sliding, deterministic IRLS/Newton, unpenalized intercept so the features must add information *beyond* the base rate), scored on Brier/log-loss against expanding-window climatology on out-of-sample test days only, ship rule pre-committed in the script header before the first run. Congressional flow deliberately excluded (measured-null aggregate, ~1 year of per-ticker history; 5e measures per-member records instead)
+- **Multi-signal research digest** (`docs/research/multi-signal.md`, 8 citations): why combination requires components with independent information (Bates & Granger 1969), why estimated weights lose to naive ones (Timmermann 2006), why equity-premium predictors die out-of-sample (Welch & Goyal 2008; Campbell & Thompson 2008), why shrinkage — not selection — is what survives (Rapach-Strauss-Zhou 2010), why ML edges live outside mega-caps (Gu-Kelly-Xiu 2020), and why 5c tested exactly one pre-committed spec (White 2000; Sullivan-Timmermann-White 1999)
+- One legend sentence recording the null: no combined "score" exists on the dashboard because the combination was tested and lost to the base rate
+
+### Measured
+- **The combination fails everywhere, with the textbook shape of overfitting noise: 0/18 tickers beat climatology on Brier at 1w, 1m, AND 3m** — identical on log-loss and on total-return prices (median BSS −1.2% / −4.2% / −10.2%; 15 walk-forward folds, ~3,700 out-of-sample days per ticker, 270 fits per horizon). Damage grows with horizon (more overlap, more room to memorize noise) and shrinks as the ridge tightens (α 0.001→0.1 improves median 3m BSS from −10.7% to −5.9%) — the best version of the model is the one shrunk back to climatology. No feature achieves better than 65% cross-fold sign agreement; pooled calibration shows stated spreads of 30+ points collapsing to ~3 realized. The `calibration.md` §5 follow-up is answered: a fitted vol weight does lean positive at 3m (the rebound sign the fixed formula got backwards) but buys nothing out-of-sample. Per the pre-committed rule, no weighted score ships anywhere in the UI
+
+---
+
 ## [0.12.0] - 2026-07-11
 ### Added
 - **Phase 5b closed: up/down probabilities measured, base rates ship.** New harness experiment (`server/harness/prob.js`): four deterministic forecasters of P(higher in 1w/1m/3m/1y) — coin, expanding-window climatology (the base rate), and the Christoffersen–Diebold drift-over-vol model with full-history vol (ablation) and with the EWMA vol layer (candidate) — scored with proper scoring rules (Brier, log-loss) plus pooled calibration tables, with the ship rule pre-committed in the script header before the first run
