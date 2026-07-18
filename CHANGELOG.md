@@ -4,6 +4,14 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.16.0] - 2026-07-18
+### Added
+- **"Browse by category" — a second, lighter tier of stock display.** Below the watchlist cards, compact quote-only rows grouped into Index funds / Big tech / Defensive & dividend / Financials-energy-industrials (the 18-name measured research basket, each tagged "✓ measured") plus **Congress favorites** — the tickers House members actually traded most in the past year, with live buy/sell counts from the new `GET /api/congress/popular` endpoint (same 365-day disclosure index, top 12 by trade count). Rows cost only a cached Finnhub quote each; the expensive data (history/signal/congress/news) loads only when a row is clicked open into the full detail panel — that two-tier design is what lets the page show many stocks without breaking the free-tier rate limits
+- Row interactions: tap a row → full detail view (report card, odds, sizing, House trades, news) without adding to the watchlist; **+** button → adds it as a full card (flips to ✓); non-basket tickers keep the honest "not measured yet" report card
+- Verified end-to-end in headless Chrome against a local backend: categories render, quotes hydrate, a congress-favorite (IBM) opens with the honest fallback and no phantom card, add-button flow works, no console errors
+
+---
+
 ## [0.15.0] - 2026-07-15
 ### Added
 - **Phase 5e: per-member congressional track records — measured with every pre-committed guardrail, shipped as transparency.** `server/harness/congressdata.js` fetches and parses ALL 5,849 digital House PTRs 2014–2026 (dual-format parser for the pre-2019 untagged PDFs, mixed-case small-caps tickers, option-keyword guard; member-name canonicalization that merges Clerk-index variants like "Marjorie Taylor Mrs Greene" without merging the two Dingells; amendment dedupe) → 43,430 trades, 256 members. `server/harness/congresstrack.js` scores them per `congressional-trading.md` §6: clock at DISCLOSURE date, excess vs SPY (total-return) at 1m/3m/6m/12m, equal weight, ≥20-buys display gate, per-member percentile vs 1,000 matched-random portfolios (same tickers, random dates, seeded), best-of-N reality check, split-sample test

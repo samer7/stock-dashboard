@@ -834,6 +834,32 @@ app.get('/api/congress/recent', async (req, res) => {
   }
 });
 
+// GET /api/congress/popular
+// The tickers House members traded MOST in the index window, with buy/sell
+// counts — powers the frontend's "Congress favorites" browse category. Like
+// /recent, this literal path must be registered before /:ticker.
+app.get('/api/congress/popular', async (req, res) => {
+  try {
+    const index = await getCongressIndex();
+    const popular = Object.entries(index.byTicker)
+      .map(([ticker, trades]) => ({
+        ticker,
+        buys: trades.filter(t => t.type === 'Buy').length,
+        sells: trades.filter(t => t.type === 'Sell').length,
+      }))
+      .sort((a, b) => (b.buys + b.sells) - (a.buys + a.sells))
+      .slice(0, 12);
+    res.json({
+      popular,
+      builtAt: new Date(congressBuiltAt).toISOString(),
+      source: 'U.S. House Clerk financial disclosures (House only)',
+    });
+  } catch (err) {
+    console.error('Error building congress index:', err);
+    res.status(502).json({ error: 'Failed to load congressional disclosures' });
+  }
+});
+
 // GET /api/congress/:ticker
 // Returns recent House trades for one ticker, newest-first. The first call after
 // startup (or after the 12h cache expires) triggers a build that downloads many

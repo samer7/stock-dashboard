@@ -68,6 +68,19 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .signal-reason { font-size: 12px; color: #888; line-height: 1.5; }
 .section-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; }
 .congress-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
+.browse-cat { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 4px; }
+.browse-cat:first-child { margin-top: 0; }
+.browse-row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.browse-row:hover { background: #f6f6f6; }
+.browse-ticker { font-weight: 600; min-width: 52px; }
+.browse-price { min-width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+.browse-change { min-width: 68px; text-align: right; font-variant-numeric: tabular-nums; }
+.browse-change.up { color: #1d8f4e; }
+.browse-change.down { color: #b83030; }
+.browse-note { font-size: 11px; color: #aaa; }
+.browse-meta { flex: 1; text-align: right; font-size: 11px; color: #999; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.browse-add { border: 1px solid #ddd; background: #fafafa; border-radius: 6px; padding: 0 8px; line-height: 20px; cursor: pointer; font-size: 13px; color: #555; }
+.browse-add:disabled { color: #bbb; cursor: default; }
 .congress-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 8px; }
 .congress-name { font-weight: 500; }
 .congress-meta { color: #888; }
@@ -174,6 +187,12 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   <div id="watchlist-grid" class="grid"></div>
   <div id="empty-state" class="empty-state" style="display:none;">
     No tickers yet. Add one above to get started.
+  </div>
+
+  <div class="feed-panel">
+    <div class="feed-title">Browse by category</div>
+    <div class="feed-sub">A wider view than your watchlist — tap any row for the full detail view</div>
+    <div id="browse-list"></div>
   </div>
 
   <div class="feed-panel">
@@ -439,6 +458,10 @@ function checkEmpty() {
 }
 
 function renderCard(ticker) {
+  // Cards exist only for watchlist tickers. Browse rows open the detail
+  // panel for non-watchlist tickers, and their refresh callbacks land here
+  // too — without this guard they'd inject a phantom card into the grid.
+  if (!watchlist.includes(ticker)) return;
   const d = STOCKS[ticker];
   const grid = document.getElementById('watchlist-grid');
   let card = document.getElementById('card-' + ticker);
@@ -921,20 +944,136 @@ function showDetail(ticker) {
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ---------- Browse by category ----------
+// A wider, cheaper tier than watchlist cards: one quote-only row per stock,
+// grouped by category. The expensive data (history/signal/congress/news) is
+// fetched only when a row is clicked open — that's what keeps a large list
+// inside the free-tier rate limits (quotes are cheap and 60s-cached
+// server-side; history costs a Twelve Data credit per ticker).
+// The four static categories are the 18-name measured research basket;
+// "Congress favorites" comes live from /api/congress/popular.
+const BROWSE_CATEGORIES = [
+  { label: 'Index funds', tickers: ['SPY', 'QQQ', 'IWM'] },
+  { label: 'Big tech', tickers: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN'] },
+  { label: 'Defensive & dividend', tickers: ['KO', 'PG', 'JNJ', 'T', 'PFE'] },
+  { label: 'Financials, energy & industrials', tickers: ['JPM', 'XOM', 'INTC', 'F', 'BA'] },
+];
+const browseQuotes = {}; // ticker -> { price, changePct } | 'error' (still loading if absent)
+let congressFavorites = { status: 'loading', rows: [] };
+
+function browseRow(ticker, meta) {
+  const q = browseQuotes[ticker];
+  let priceHtml = '<span class="browse-price browse-note">…</span><span class="browse-change"></span>';
+  if (q === 'error') {
+    priceHtml = '<span class="browse-price browse-note">—</span><span class="browse-change"></span>';
+  } else if (q) {
+    const up = q.changePct >= 0;
+    priceHtml = `<span class="browse-price">$${fmtNum(q.price)}</span>` +
+      `<span class="browse-change ${up ? 'up' : 'down'}">${up ? '+' : '-'}${fmtNum(Math.abs(q.changePct))}%</span>`;
+  }
+  const inList = watchlist.includes(ticker);
+  return `<div class="browse-row" data-ticker="${esc(ticker)}">
+    <span class="browse-ticker">${esc(ticker)}</span>
+    ${priceHtml}
+    <span class="browse-meta">${meta || ''}</span>
+    <button class="browse-add" data-action="browse-add" data-ticker="${esc(ticker)}"
+      title="${inList ? 'Already on your watchlist' : 'Add to watchlist'}"${inList ? ' disabled' : ''}>${inList ? '✓' : '+'}</button>
+  </div>`;
+}
+
+function renderBrowse() {
+  const measuredTag = (t) => HARNESS_RESULTS.tickers[t] ? '✓ measured' : '';
+  let html = BROWSE_CATEGORIES.map(c =>
+    `<div class="browse-cat">${esc(c.label)}</div>` +
+    c.tickers.map(t => browseRow(t, measuredTag(t))).join('')
+  ).join('');
+  html += `<div class="browse-cat">Congress favorites — most traded by House members, past year</div>`;
+  if (congressFavorites.status === 'loading') {
+    html += '<div class="browse-note" style="padding:4px 6px;">Loading House trading activity… (first load after the backend wakes can take a minute)</div>';
+  } else if (congressFavorites.status === 'error') {
+    html += '<div class="browse-note" style="padding:4px 6px;">Couldn’t load this list right now.</div>';
+  } else {
+    html += congressFavorites.rows.map(r =>
+      browseRow(r.ticker, `${r.buys} buys / ${r.sells} sells${HARNESS_RESULTS.tickers[r.ticker] ? ' · ✓ measured' : ''}`)
+    ).join('');
+  }
+  html += '<div class="browse-note" style="padding:8px 6px 0;">Tap a row for the full detail view (signal, report card, House trades, news) · + adds it to your watchlist · “✓ measured” = in the 18-name backtested research basket.</div>';
+  document.getElementById('browse-list').innerHTML = html;
+}
+
+// Quote-only hydration for browse rows, a few at a time to stay polite to
+// the backend (which caches each quote for 60s anyway).
+async function loadBrowseQuotes(tickers) {
+  const todo = tickers.filter(t => !(t in browseQuotes));
+  if (todo.length === 0) return;
+  let i = 0;
+  const worker = async () => {
+    while (i < todo.length) {
+      const t = todo[i++];
+      const q = await fetchQuote(t);
+      browseQuotes[t] = (q && typeof q.price === 'number')
+        ? { price: q.price, changePct: q.changePct }
+        : 'error';
+    }
+  };
+  const timer = setInterval(renderBrowse, 800); // repaint as quotes arrive
+  await Promise.all(Array.from({ length: Math.min(4, todo.length) }, worker));
+  clearInterval(timer);
+  renderBrowse();
+}
+
+async function loadCongressFavorites() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/congress/popular`);
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    congressFavorites = { status: 'loaded', rows: (Array.isArray(data.popular) ? data.popular : []).filter(r => sanitizeTicker(r.ticker)) };
+    renderBrowse();
+    loadBrowseQuotes(congressFavorites.rows.map(r => r.ticker));
+  } catch (e) {
+    congressFavorites = { status: 'error', rows: [] };
+    renderBrowse();
+  }
+}
+
+// Open the full detail view for a browse row WITHOUT adding it to the
+// watchlist: create the store entry and kick off the same fetches a
+// watchlist card gets (this is the lazy tier-2 load), then show the panel.
+// renderCard() skips non-watchlist tickers, so no phantom card appears.
+function openBrowseTicker(raw) {
+  const ticker = sanitizeTicker(raw);
+  if (!ticker) return;
+  if (!STOCKS[ticker]) {
+    STOCKS[ticker] = makeStock();
+    refreshLiveQuote(ticker);
+    refreshSignal(ticker);
+    refreshCongress(ticker);
+    refreshNews(ticker);
+  }
+  showDetail(ticker);
+}
+
 // ---------- Actions ----------
+function addTickerByName(raw) {
+  const val = sanitizeTicker(raw);
+  if (!val || watchlist.includes(val)) return;
+  const isNew = !STOCKS[val]; // may already exist from a browse-row detail view
+  if (isNew) STOCKS[val] = makeStock();
+  watchlist.push(val); saveWatchlist();
+  renderCard(val); checkEmpty();
+  refreshLiveQuote(val);   // always refresh the price on add
+  if (isNew) {
+    refreshSignal(val);    // pull real MA-based signal + sparkline
+    refreshCongress(val);  // pull real House congressional trades
+    refreshNews(val);      // pull recent news headlines
+  }
+  renderBrowse(); // flip this ticker's + to ✓ in the browse rows
+}
+
 function addTicker() {
   const input = document.getElementById('add-input');
-  const val = sanitizeTicker(input.value);
-  if (!val || watchlist.includes(val)) { input.value = ''; return; }
-
-  if (!STOCKS[val]) STOCKS[val] = makeStock();
-  watchlist.push(val); saveWatchlist();
+  addTickerByName(input.value);
   input.value = '';
-  renderCard(val); checkEmpty();
-  refreshLiveQuote(val); // pull real price for the newly added ticker
-  refreshSignal(val);    // pull real MA-based signal + sparkline
-  refreshCongress(val);  // pull real House congressional trades
-  refreshNews(val);      // pull recent news headlines
 }
 
 function removeTicker(ticker) {
@@ -944,6 +1083,7 @@ function removeTicker(ticker) {
   const panel = document.getElementById('detail-panel');
   if (panel.dataset.ticker === ticker) panel.style.display = 'none';
   checkEmpty();
+  renderBrowse(); // flip the browse row's ✓ back to +
 }
 
 // ---------- Event wiring (delegation, no inline handlers) ----------
@@ -967,6 +1107,13 @@ document.getElementById('detail-panel').addEventListener('click', e => {
   }
 });
 
+document.getElementById('browse-list').addEventListener('click', e => {
+  const addBtn = e.target.closest('[data-action="browse-add"]');
+  if (addBtn) { e.stopPropagation(); addTickerByName(addBtn.dataset.ticker); return; }
+  const row = e.target.closest('.browse-row');
+  if (row) openBrowseTicker(row.dataset.ticker);
+});
+
 // ---------- Init ----------
 // Every ticker persisted in the watchlist gets a placeholder entry and a card
 // (previously only hardcoded tickers rendered, so user-added ones silently
@@ -983,6 +1130,9 @@ watchlist.forEach(t => {
   refreshNews(t);      // recent news headlines (Finnhub company news)
 });
 refreshActivityFeed(); // cross-ticker feed of the newest House trades
+renderBrowse();        // category rows render immediately (quotes fill in)
+loadBrowseQuotes(BROWSE_CATEGORIES.flatMap(c => c.tickers));
+loadCongressFavorites(); // the dynamic "Congress favorites" category
 </script>
 </body>
 </html>
