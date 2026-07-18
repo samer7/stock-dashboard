@@ -4,6 +4,18 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.17.0] - 2026-07-18
+### Added
+- **Phase 6a: the paper portfolio — fake money, real prices, and a memory.** A new panel between the watchlist and the browse section: start with $10,000 of fake cash, buy any ticker by dollar amount at the live quote, sell positions at the live quote, 0.1% fee per trade (the harness's own cost model). Everything persists in localStorage; every reload revalues holdings at live prices against the benchmark of having put the whole pot into SPY on day one (price-only — the footer notes the missing ~1.2%/yr SPY dividend yield flatters the portfolio side)
+- **Every trade records what the dashboard said at that moment** — the signal label, the expected swing, the vol-sized exposure — shown in the trade log ("dashboard said: signal HOLD · swing ±7.4% · vol-sized ~96%") and kept in full. This is the point of Phase 6: the shipped Phase-5 numbers face a forward test they can't backfit, and the snapshots are the grading records
+- Guardrails: honest "fake money, not advice" footer, reset with confirmation, minimum $10 trade, insufficient-cash and bad-ticker errors, "valuing…" states instead of stale numbers
+- Verified end-to-end in headless Chrome against the live backend: start → buy $1,000 AAPL (cash exactly $8,999.00 after the $1 fee) → snapshot logged → reload persistence + revaluation → sell with realized P&L → reset clears storage; no console errors
+
+### Notes
+- Phase 6b (auto-follow: a second portfolio mechanically running the measured vol-sizing rule via the portfolio.js engine) is the next step; 6a's manual account and snapshot log come first deliberately — the grading machinery needs trades to grade
+
+---
+
 ## [0.16.0] - 2026-07-18
 ### Added
 - **"Browse by category" — a second, lighter tier of stock display.** Below the watchlist cards, compact quote-only rows grouped into Index funds / Big tech / Defensive & dividend / Financials-energy-industrials (the 18-name measured research basket, each tagged "✓ measured") plus **Congress favorites** — the tickers House members actually traded most in the past year, with live buy/sell counts from the new `GET /api/congress/popular` endpoint (same 365-day disclosure index, top 12 by trade count). Rows cost only a cached Finnhub quote each; the expensive data (history/signal/congress/news) loads only when a row is clicked open into the full detail panel — that two-tier design is what lets the page show many stocks without breaking the free-tier rate limits

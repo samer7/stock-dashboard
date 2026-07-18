@@ -81,6 +81,14 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .browse-meta { flex: 1; text-align: right; font-size: 11px; color: #999; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .browse-add { border: 1px solid #ddd; background: #fafafa; border-radius: 6px; padding: 0 8px; line-height: 20px; cursor: pointer; font-size: 13px; color: #555; }
 .browse-add:disabled { color: #bbb; cursor: default; }
+.paper-row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; font-size: 13px; }
+.paper-row:hover { background: #f6f6f6; }
+.paper-form { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+.paper-form input { border: 1px solid #ddd; border-radius: 8px; padding: 6px 10px; font-size: 13px; width: 110px; }
+.paper-btn { border: 1px solid #ddd; background: #fafafa; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 13px; color: #333; }
+.paper-btn:hover { background: #f0f0f0; }
+.paper-log { font-size: 11px; color: #888; line-height: 1.6; margin-top: 6px; }
+.paper-msg { font-size: 12px; color: #b83030; margin-top: 4px; min-height: 16px; }
 .congress-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 10px; background: #f8f8f8; border-radius: 8px; }
 .congress-name { font-weight: 500; }
 .congress-meta { color: #888; }
@@ -187,6 +195,12 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   <div id="watchlist-grid" class="grid"></div>
   <div id="empty-state" class="empty-state" style="display:none;">
     No tickers yet. Add one above to get started.
+  </div>
+
+  <div class="feed-panel">
+    <div class="feed-title">Paper portfolio — fake money, real prices</div>
+    <div class="feed-sub">Phase 6 of the project: test the dashboard's numbers forward, in the open. Live prices, 0.1% cost per trade, benchmarked against simply buying SPY on day one.</div>
+    <div id="paper-panel"></div>
   </div>
 
   <div class="feed-panel">
@@ -1053,6 +1067,216 @@ function openBrowseTicker(raw) {
   showDetail(ticker);
 }
 
+// ---------- Paper portfolio (Phase 6a) ----------
+// A fake-money account that trades at LIVE prices and remembers what the
+// dashboard was saying at the moment of every trade. That snapshot is the
+// point: Phase 5 shipped numbers (signal, expected swing, vol-sized
+// exposure) with backtests behind them, and this is their pre-registered
+// forward test — every claim gets graded against what actually happened
+// next, in the open. Costs match the harness (0.1% of traded dollars).
+// Benchmark: the whole starting pot into SPY on day one, price-only — which
+// understates SPY by its ~1.2%/yr dividend yield and therefore flatters the
+// portfolio side of the comparison; the honesty footer says so.
+const PAPER_COST = 0.001; // 0.1% of traded dollars, same as the harness
+let paper = JSON.parse(localStorage.getItem('paper_v1') || 'null');
+const paperQuotes = {}; // ticker -> latest price used for valuation
+
+function savePaper() { localStorage.setItem('paper_v1', JSON.stringify(paper)); }
+function paperMsg(text) {
+  const el = document.getElementById('paper-msg');
+  if (el) el.textContent = text || '';
+}
+
+// What was the dashboard saying about this ticker right now? Recorded with
+// every trade so the forward test can grade the claims later. Null fields
+// mean "wasn't loaded at trade time" — recorded honestly as unknown.
+function paperSnapshot(ticker) {
+  const d = STOCKS[ticker] || {};
+  const r = HARNESS_RESULTS.tickers[ticker];
+  const swing = (d.volatility && typeof d.volatility.monthPct === 'number') ? d.volatility.monthPct : null;
+  return {
+    signal: d.signal ? d.signal.label : null,
+    swing,
+    exposure: (r && r.vt && swing) ? Math.round(Math.min(1, r.vt.target / swing) * 100) : null,
+  };
+}
+
+async function startPaper() {
+  paperMsg('Fetching the SPY benchmark price…');
+  const q = await fetchQuote('SPY');
+  if (!q || typeof q.price !== 'number') {
+    paperMsg('Couldn’t fetch the SPY benchmark price — the backend may still be waking up. Try again in ~30s.');
+    return;
+  }
+  paper = {
+    created: new Date().toISOString().slice(0, 10),
+    startCash: 10000, cash: 10000,
+    positions: {}, // ticker -> { shares, costBasis } (costBasis includes fees)
+    trades: [],    // newest first
+    spyStart: q.price,
+  };
+  savePaper();
+  paperQuotes['SPY'] = q.price;
+  renderPaper();
+}
+
+async function paperBuy() {
+  const ticker = sanitizeTicker(document.getElementById('paper-ticker').value || '');
+  const dollars = parseFloat(document.getElementById('paper-dollars').value);
+  if (!ticker) { paperMsg('Enter a valid ticker (letters only, e.g. SPY).'); return; }
+  if (!(dollars >= 10)) { paperMsg('Enter a dollar amount of at least $10.'); return; }
+  const fee = dollars * PAPER_COST;
+  if (dollars + fee > paper.cash + 1e-9) {
+    paperMsg(`Not enough fake cash: $${fmtNum(paper.cash)} available (incl. the 0.1% fee).`);
+    return;
+  }
+  paperMsg('Executing at the live price…');
+  const q = await fetchQuote(ticker);
+  if (!q || typeof q.price !== 'number' || q.price <= 0) {
+    paperMsg(`Couldn’t get a live price for ${ticker} — check the symbol.`);
+    return;
+  }
+  // Make sure the snapshot has something to record: load the ticker's
+  // history (signal + vol) if this is its first appearance anywhere.
+  if (!STOCKS[ticker]) {
+    STOCKS[ticker] = makeStock();
+    refreshLiveQuote(ticker); refreshCongress(ticker); refreshNews(ticker);
+  }
+  if (!STOCKS[ticker].signal) { try { await refreshSignal(ticker); } catch (e) {} }
+
+  const shares = dollars / q.price;
+  const pos = paper.positions[ticker] || { shares: 0, costBasis: 0 };
+  pos.shares += shares;
+  pos.costBasis += dollars + fee;
+  paper.positions[ticker] = pos;
+  paper.cash -= dollars + fee;
+  paper.trades.unshift({
+    date: new Date().toISOString().slice(0, 10),
+    side: 'Buy', ticker, dollars, price: q.price, shares,
+    snap: paperSnapshot(ticker),
+  });
+  savePaper();
+  paperQuotes[ticker] = q.price;
+  renderPaper();
+}
+
+async function paperSell(ticker) {
+  const pos = paper.positions[ticker];
+  if (!pos) return;
+  paperMsg('Selling at the live price…');
+  const q = await fetchQuote(ticker);
+  if (!q || typeof q.price !== 'number' || q.price <= 0) {
+    paperMsg(`Couldn’t get a live price for ${ticker} — try again in a moment.`);
+    return;
+  }
+  const proceeds = pos.shares * q.price;
+  const fee = proceeds * PAPER_COST;
+  paper.cash += proceeds - fee;
+  paper.trades.unshift({
+    date: new Date().toISOString().slice(0, 10),
+    side: 'Sell', ticker, dollars: proceeds, price: q.price, shares: pos.shares,
+    realized: (proceeds - fee) - pos.costBasis,
+    snap: paperSnapshot(ticker),
+  });
+  delete paper.positions[ticker];
+  savePaper();
+  paperQuotes[ticker] = q.price;
+  renderPaper();
+}
+
+function resetPaper() {
+  if (!confirm('Wipe the paper portfolio and its whole trade log? This cannot be undone.')) return;
+  paper = null;
+  localStorage.removeItem('paper_v1');
+  renderPaper();
+}
+
+// Refresh valuation quotes for every held ticker plus the SPY benchmark.
+async function refreshPaperQuotes() {
+  if (!paper) return;
+  const tickers = ['SPY', ...Object.keys(paper.positions)];
+  for (const t of tickers) {
+    const q = await fetchQuote(t);
+    if (q && typeof q.price === 'number') paperQuotes[t] = q.price;
+  }
+  renderPaper();
+}
+
+function renderPaper() {
+  const el = document.getElementById('paper-panel');
+  if (!paper) {
+    el.innerHTML = `
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        Start a fake-money account and trade at real live prices. Every trade also records
+        what this dashboard was saying at that moment — the signal, the expected swing, the
+        vol-sized exposure — so its claims get graded in the open, forward, where backtests can't help them.
+      </div>
+      <div class="paper-form"><button class="paper-btn" data-action="paper-start">Start with $10,000 (fake)</button></div>
+      <div class="paper-msg" id="paper-msg"></div>`;
+    return;
+  }
+
+  const held = Object.entries(paper.positions);
+  let posValue = 0, valuing = false;
+  const rows = held.map(([t, pos]) => {
+    const px = paperQuotes[t];
+    const val = typeof px === 'number' ? pos.shares * px : null;
+    if (val === null) valuing = true; else posValue += val;
+    const pnl = val === null ? null : val - pos.costBasis;
+    const pnlHtml = pnl === null ? '<span class="browse-note">valuing…</span>'
+      : `<span class="browse-change ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : '-'}$${fmtNum(Math.abs(pnl))} (${pnl >= 0 ? '+' : '-'}${fmtNum(Math.abs(pnl / pos.costBasis * 100))}%)</span>`;
+    return `<div class="paper-row" data-ticker="${esc(t)}">
+      <span class="browse-ticker">${esc(t)}</span>
+      <span class="browse-note">${fmtNum(pos.shares, 4)} sh</span>
+      <span class="browse-price">${val === null ? '…' : '$' + fmtNum(val)}</span>
+      ${pnlHtml}
+      <span class="browse-meta"></span>
+      <button class="paper-btn" data-action="paper-sell" data-ticker="${esc(t)}">Sell all</button>
+    </div>`;
+  }).join('');
+
+  const total = paper.cash + posValue;
+  const spyNow = paperQuotes['SPY'];
+  const bench = typeof spyNow === 'number' ? paper.startCash * (spyNow / paper.spyStart) : null;
+  const diff = bench === null || valuing ? null : total - bench;
+  const benchHtml = diff === null ? '—'
+    : `${diff >= 0 ? '+' : '-'}$${fmtNum(Math.abs(diff))} (${diff >= 0 ? '+' : '-'}${fmtNum(Math.abs(diff / bench * 100))}%)`;
+
+  const log = paper.trades.slice(0, 8).map(tr => {
+    const s = tr.snap || {};
+    const said = [
+      s.signal ? `signal ${s.signal}` : null,
+      typeof s.swing === 'number' ? `swing ±${s.swing.toFixed(1)}%` : null,
+      typeof s.exposure === 'number' ? `vol-sized ~${s.exposure}%` : null,
+    ].filter(Boolean).join(' · ');
+    const realized = typeof tr.realized === 'number'
+      ? ` · realized ${tr.realized >= 0 ? '+' : '-'}$${fmtNum(Math.abs(tr.realized))}` : '';
+    return `<div>${esc(tr.date)} · ${esc(tr.side)} $${fmtNum(tr.dollars)} ${esc(tr.ticker)} @ $${fmtNum(tr.price)}${realized}${said ? ` · <span style="color:#aaa;">dashboard said: ${esc(said)}</span>` : ''}</div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="metrics-row">
+      <div class="metric"><div class="metric-label">Total value</div><div class="metric-value">${valuing ? '…' : '$' + fmtNum(total)}</div></div>
+      <div class="metric"><div class="metric-label">Cash</div><div class="metric-value">$${fmtNum(paper.cash)}</div></div>
+      <div class="metric"><div class="metric-label">vs just buying SPY</div><div class="metric-value" style="color:${diff === null ? '#888' : diff >= 0 ? '#1d8f4e' : '#b83030'};">${benchHtml}</div></div>
+      <div class="metric"><div class="metric-label">Since</div><div class="metric-value">${esc(paper.created)}</div></div>
+    </div>
+    ${held.length ? rows : '<div class="browse-note" style="padding:6px;">No positions yet — buy something below.</div>'}
+    <div class="paper-form">
+      <input id="paper-ticker" placeholder="Ticker" maxlength="6">
+      <input id="paper-dollars" placeholder="$ amount" type="number" min="10">
+      <button class="paper-btn" data-action="paper-buy">Buy at live price</button>
+    </div>
+    <div class="paper-msg" id="paper-msg"></div>
+    ${log ? `<div class="paper-log">${log}${paper.trades.length > 8 ? `<div>…and ${paper.trades.length - 8} earlier trades (all kept for grading).</div>` : ''}</div>` : ''}
+    <div class="browse-note" style="padding:8px 0 0;">
+      Fake money — nothing here is advice. 0.1% fee per trade, matching the backtests. The SPY benchmark is
+      price-only (its ~1.2%/yr of dividends isn't counted, which flatters the portfolio side). Trade snapshots
+      are kept so the dashboard's own claims can be graded later.
+      <a href="#" data-action="paper-reset" style="color:#aaa;">Reset portfolio</a>
+    </div>`;
+}
+
 // ---------- Actions ----------
 function addTickerByName(raw) {
   const val = sanitizeTicker(raw);
@@ -1114,6 +1338,15 @@ document.getElementById('browse-list').addEventListener('click', e => {
   if (row) openBrowseTicker(row.dataset.ticker);
 });
 
+document.getElementById('paper-panel').addEventListener('click', e => {
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+  if (action.dataset.action === 'paper-start') startPaper();
+  else if (action.dataset.action === 'paper-buy') paperBuy();
+  else if (action.dataset.action === 'paper-sell') paperSell(action.dataset.ticker);
+  else if (action.dataset.action === 'paper-reset') { e.preventDefault(); resetPaper(); }
+});
+
 // ---------- Init ----------
 // Every ticker persisted in the watchlist gets a placeholder entry and a card
 // (previously only hardcoded tickers rendered, so user-added ones silently
@@ -1133,6 +1366,8 @@ refreshActivityFeed(); // cross-ticker feed of the newest House trades
 renderBrowse();        // category rows render immediately (quotes fill in)
 loadBrowseQuotes(BROWSE_CATEGORIES.flatMap(c => c.tickers));
 loadCongressFavorites(); // the dynamic "Congress favorites" category
+renderPaper();           // paper portfolio (Phase 6a) — intro or holdings
+refreshPaperQuotes();    // live valuation for held tickers + SPY benchmark
 </script>
 </body>
 </html>

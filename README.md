@@ -131,11 +131,11 @@ The honest core of the project. **Goal:** not "predict prices precisely" (not ac
 - ✅ **5e — Per-member congressional track records: measured, and the literature's null held.** All 5,849 digital House PTRs 2014–2026 parsed (43,430 trades, 256 members), scored from the *disclosure* date against SPY with the full guardrail set pre-committed in `docs/research/congressional-trading.md` §6 (≥20-buy minimum, matched-random luck percentiles, best-of-N reality check, split-sample). Verdict (§7): pooled buys +1.2% vs SPY at 6m on a 50% hit rate (survivorship-tilted coverage, stated in the UI); 7 of 77 members beat the 95th luck percentile (chance predicts ~4); the best-of-N check fails — the top record sits at the 93rd percentile of what luck alone produces across 77 members. **No member is endorsed.** What ships is transparency: each qualifying member's measured record with its luck percentile, under a pooled-verdict footer. **Phase 5e is complete — and with it, all of Phase 5.**
 - Caveat to test, not assume: the congressional signal carries a ~45-day disclosure delay, so its predictive horizon is long (≈6–12 months) and likely weak for short-term moves.
 
-### 🔲 Phase 6 — Paper trading / simulated portfolio ("simulated run")
+### 🔸 Phase 6 — Paper trading / simulated portfolio ("simulated run") — 6a live
 
 Hypothetically invest fake money by following the site's suggestions and track the results. Built on the **same simulator core as Phase 5a** — a backtest and a paper-trade are the same engine with a different clock (historical vs. forward). The auto-follow mode is a **live, lookahead-proof forward-test** of the strategy, which is the gold standard for proving signals aren't fooling us.
 
-- **6a — Manual paper portfolio:** start with fake cash, buy/sell at live prices on suggestions, transaction log, value charted **against a buy-and-hold benchmark**. localStorage-backed (single-user). Can ship relatively early as a standalone feature.
+- ✅ **6a — Manual paper portfolio (v0.17.0):** $10,000 fake cash, buy/sell any ticker at live prices with the harness's 0.1% cost, localStorage-backed, continuously valued against "the whole pot into SPY on day one." The key feature is the **trade snapshot log**: every trade records what the dashboard said at that moment (signal, expected swing, vol-sized exposure), so the Phase-5 claims face an open forward test they can't backfit.
 - **6b — Auto-follow mode:** the system executes its own signals forward over time = live forward-test, reusing the Phase 5 engine + metrics (return, Sharpe, drawdown).
 - Honest caveat: a single run reflects whatever market regime it ran in and accrues slowly — a great gut-check and demo, but a complement to backtesting, not a replacement.
 
