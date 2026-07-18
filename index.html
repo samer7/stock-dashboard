@@ -204,6 +204,12 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   </div>
 
   <div class="feed-panel">
+    <div class="feed-title">Auto-follow — the measured sizing rule, running itself</div>
+    <div class="feed-sub">Phase 6b: a second fake-money account that mechanically holds SPY at the vol-sized exposure — the one rule that measured positive in our backtests. No human decisions; the forward run is the rule's real exam.</div>
+    <div id="auto-panel"></div>
+  </div>
+
+  <div class="feed-panel">
     <div class="feed-title">Browse by category</div>
     <div class="feed-sub">A wider view than your watchlist — tap any row for the full detail view</div>
     <div id="browse-list"></div>
@@ -1277,6 +1283,134 @@ function renderPaper() {
     </div>`;
 }
 
+// ---------- Auto-follow (Phase 6b) ----------
+// A mechanical account: hold SPY at w = min(1, normal vol / forecast vol),
+// the exact rule voltarget.js measured positive (Sharpe 0.78 vs 0.63, worst
+// drop -35% vs -55% over ~19y — keep the parameters in sync with that
+// script: 5pp rebalance band, 0.1% cost on traded dollars, target from
+// HARNESS_RESULTS.tickers.SPY.vt). The forecast is the same EWMA monthPct
+// the detail panel shows, fetched live from /api/history/SPY.
+//
+// Execution model, stated honestly: the rule is checked when the page loads
+// (at most once per calendar day), because a static site has no scheduler —
+// which is exactly how a human follower would run it. The measured turnover
+// is ~2 rebalances/year, so visit-driven checking loses almost nothing.
+// It can only ever DE-risk (no leverage): between rebalances it just holds.
+let auto = JSON.parse(localStorage.getItem('auto_v1') || 'null');
+const AUTO_BAND = 0.05;
+
+function saveAuto() { localStorage.setItem('auto_v1', JSON.stringify(auto)); }
+
+// Live inputs for the rule: SPY quote + SPY EWMA forecast (server-cached).
+async function autoInputs() {
+  const q = await fetchQuote('SPY');
+  let monthPct = null;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/history/SPY`);
+    if (res.ok) {
+      const h = await res.json();
+      if (h.volatility && typeof h.volatility.monthPct === 'number') monthPct = h.volatility.monthPct;
+    }
+  } catch (e) {}
+  return (q && typeof q.price === 'number' && monthPct) ? { price: q.price, monthPct } : null;
+}
+
+async function startAuto() {
+  const el = document.getElementById('auto-msg');
+  if (el) el.textContent = 'Fetching SPY price and volatility forecast…';
+  const inp = await autoInputs();
+  if (!inp) {
+    if (el) el.textContent = 'Couldn’t fetch SPY data — the backend may still be waking up. Try again in ~30s.';
+    return;
+  }
+  auto = {
+    created: new Date().toISOString().slice(0, 10),
+    startCash: 10000, cash: 10000, shares: 0,
+    spyStart: inp.price, lastCheck: null, log: [],
+  };
+  saveAuto();
+  await autoCheck(inp); // take the initial position immediately
+}
+
+// The whole strategy. Runs on load; trades only when the band is exceeded.
+async function autoCheck(preloaded) {
+  if (!auto) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const firstTrade = auto.log.length === 0;
+  if (auto.lastCheck === today && !firstTrade) { renderAuto(); return; } // one check per day
+  const inp = preloaded || await autoInputs();
+  if (!inp) { renderAuto(); return; } // can't price today — keep holding, try next visit
+  const target = HARNESS_RESULTS.tickers.SPY.vt.target;
+  const targetW = Math.min(1, target / inp.monthPct);
+  const value = auto.cash + auto.shares * inp.price;
+  const heldW = (auto.shares * inp.price) / value;
+  if (firstTrade || Math.abs(targetW - heldW) > AUTO_BAND) {
+    let delta = targetW * value - auto.shares * inp.price; // dollars to move into SPY
+    // Buying costs delta + fee in cash — cap so the fee never overdraws.
+    if (delta > 0) delta = Math.min(delta, auto.cash / (1 + PAPER_COST));
+    const fee = Math.abs(delta) * PAPER_COST;
+    auto.shares += delta / inp.price;
+    auto.cash -= delta + fee;
+    auto.log.unshift({
+      date: today, fromW: Math.round(heldW * 100), toW: Math.round(targetW * 100),
+      price: inp.price, forecast: inp.monthPct, target,
+    });
+  }
+  auto.lastCheck = today;
+  auto.lastPrice = inp.price;      // remembered for valuation between fetches
+  auto.lastForecast = inp.monthPct;
+  saveAuto();
+  renderAuto();
+}
+
+function resetAuto() {
+  if (!confirm('Wipe the auto-follow account and its rebalance log?')) return;
+  auto = null;
+  localStorage.removeItem('auto_v1');
+  renderAuto();
+}
+
+function renderAuto() {
+  const el = document.getElementById('auto-panel');
+  if (!auto) {
+    el.innerHTML = `
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        In ~19 years of backtests, holding SPY at <em>min(1, normal&nbsp;vol&nbsp;/&nbsp;forecast&nbsp;vol)</em> —
+        trimming only when volatility runs above its own norm, never guessing direction — improved
+        return-per-risk and cut the worst drop nearly in half. This account runs that rule with no
+        human input. Forward, live, in the open: if the measured edge is real, it shows up here.
+      </div>
+      <div class="paper-form"><button class="paper-btn" data-action="auto-start">Start the machine with $10,000 (fake)</button></div>
+      <div class="paper-msg" id="auto-msg"></div>`;
+    return;
+  }
+  const price = auto.lastPrice, forecast = auto.lastForecast;
+  const value = auto.cash + auto.shares * (price || 0);
+  const heldW = value > 0 && price ? (auto.shares * price) / value : 0;
+  const bench = price ? auto.startCash * (price / auto.spyStart) : null;
+  const diff = bench === null ? null : value - bench;
+  const target = HARNESS_RESULTS.tickers.SPY.vt.target;
+  const log = auto.log.slice(0, 6).map(r =>
+    `<div>${esc(r.date)} · exposure ${r.fromW}% → <strong>${r.toW}%</strong> @ $${fmtNum(r.price)} · forecast ±${r.forecast.toFixed(1)}% vs norm ±${r.target}%</div>`
+  ).join('');
+  el.innerHTML = `
+    <div class="metrics-row">
+      <div class="metric"><div class="metric-label">Total value</div><div class="metric-value">$${fmtNum(value)}</div></div>
+      <div class="metric"><div class="metric-label">SPY exposure now</div><div class="metric-value">${Math.round(heldW * 100)}%</div></div>
+      <div class="metric"><div class="metric-label">vs 100% SPY always</div><div class="metric-value" style="color:${diff === null ? '#888' : diff >= 0 ? '#1d8f4e' : '#b83030'};">${diff === null ? '—' : `${diff >= 0 ? '+' : '-'}$${fmtNum(Math.abs(diff))}`}</div></div>
+      <div class="metric"><div class="metric-label">Since</div><div class="metric-value">${esc(auto.created)}</div></div>
+    </div>
+    <div style="font-size:12px;color:#555;">Rule: hold min(1, ±${target}% ÷ current forecast${forecast ? ` ±${forecast.toFixed(1)}%` : ''}) of SPY · checked on page load, at most daily · rebalances only past a 5pp band · 0.1% cost on traded dollars.</div>
+    <div class="paper-msg" id="auto-msg"></div>
+    ${log ? `<div class="paper-log">${log}</div>` : ''}
+    <div class="browse-note" style="padding:8px 0 0;">
+      Fake money, not advice. Expect this to TRAIL 100%-SPY in calm rising markets (that's the measured
+      cost of the insurance) and to earn its keep in storms — the backtested pair was Sharpe 0.78 vs 0.63
+      and worst drop −35% vs −55%. Whether that repeats forward is exactly what this account exists to find out.
+      <a href="#" data-action="auto-reset" style="color:#aaa;">Reset</a>
+    </div>`;
+}
+
 // ---------- Actions ----------
 function addTickerByName(raw) {
   const val = sanitizeTicker(raw);
@@ -1347,6 +1481,13 @@ document.getElementById('paper-panel').addEventListener('click', e => {
   else if (action.dataset.action === 'paper-reset') { e.preventDefault(); resetPaper(); }
 });
 
+document.getElementById('auto-panel').addEventListener('click', e => {
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+  if (action.dataset.action === 'auto-start') startAuto();
+  else if (action.dataset.action === 'auto-reset') { e.preventDefault(); resetAuto(); }
+});
+
 // ---------- Init ----------
 // Every ticker persisted in the watchlist gets a placeholder entry and a card
 // (previously only hardcoded tickers rendered, so user-added ones silently
@@ -1368,6 +1509,8 @@ loadBrowseQuotes(BROWSE_CATEGORIES.flatMap(c => c.tickers));
 loadCongressFavorites(); // the dynamic "Congress favorites" category
 renderPaper();           // paper portfolio (Phase 6a) — intro or holdings
 refreshPaperQuotes();    // live valuation for held tickers + SPY benchmark
+renderAuto();            // auto-follow (Phase 6b) — intro or account state
+autoCheck();             // run the sizing rule (at most once per day)
 </script>
 </body>
 </html>

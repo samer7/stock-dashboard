@@ -136,7 +136,7 @@ The honest core of the project. **Goal:** not "predict prices precisely" (not ac
 Hypothetically invest fake money by following the site's suggestions and track the results. Built on the **same simulator core as Phase 5a** — a backtest and a paper-trade are the same engine with a different clock (historical vs. forward). The auto-follow mode is a **live, lookahead-proof forward-test** of the strategy, which is the gold standard for proving signals aren't fooling us.
 
 - ✅ **6a — Manual paper portfolio (v0.17.0):** $10,000 fake cash, buy/sell any ticker at live prices with the harness's 0.1% cost, localStorage-backed, continuously valued against "the whole pot into SPY on day one." The key feature is the **trade snapshot log**: every trade records what the dashboard said at that moment (signal, expected swing, vol-sized exposure), so the Phase-5 claims face an open forward test they can't backfit.
-- **6b — Auto-follow mode:** the system executes its own signals forward over time = live forward-test, reusing the Phase 5 engine + metrics (return, Sharpe, drawdown).
+- ✅ **6b — Auto-follow mode (v0.18.0):** a mechanical account holding SPY at the measured vol-sized exposure (`min(1, normal vol / forecast vol)`, same band/cost/target as the backtest), evaluated on page load at most daily, with a rebalance log and an always-100%-SPY benchmark. The one measured-positive strategy now runs forward, live, with zero human input — its real exam.
 - Honest caveat: a single run reflects whatever market regime it ran in and accrues slowly — a great gut-check and demo, but a complement to backtesting, not a replacement.
 
 ### 🔲 Phase 7 — UI polish (intentionally later)

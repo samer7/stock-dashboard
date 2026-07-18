@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.18.0] - 2026-07-18
+### Added
+- **Phase 6b: the auto-follow account — the measured sizing rule, running itself.** A second fake-money account that mechanically holds SPY at `min(1, normal vol / forecast vol)` — the exact rule `voltarget.js` measured positive — with the same parameters as the backtest (5pp rebalance band, 0.1% cost on traded dollars, the frozen ±3.9% SPY target, live EWMA forecast from `/api/history/SPY`). No human decisions: the rule is evaluated on page load, at most once per calendar day (honestly documented — a static site has no scheduler, and the measured turnover is ~2 rebalances/year, so visit-driven checking loses almost nothing). It can only ever de-risk; the panel says plainly to expect it to trail 100%-SPY in calm markets and earn its keep in storms — the forward run is the rule's real exam
+- Rebalance log ("exposure 0% → 100% @ $743 · forecast ±3.7% vs norm ±3.9%"), value vs an always-100%-SPY benchmark, reset with confirmation. Buy-side sizing caps at available cash so fees never overdraw
+- Verified in headless Chrome against the live backend: initial position taken correctly (no negative cash, exactly one log entry), same-day reloads idempotent, 6a panel unaffected, reset works, no console errors
+
+### Notes
+- **Phase 6 is now feature-complete for its first iteration** (6a manual + 6b auto-follow); what remains is time — the snapshot-grading report lands once trades have aged past their horizons
+
+---
+
 ## [0.17.0] - 2026-07-18
 ### Added
 - **Phase 6a: the paper portfolio — fake money, real prices, and a memory.** A new panel between the watchlist and the browse section: start with $10,000 of fake cash, buy any ticker by dollar amount at the live quote, sell positions at the live quote, 0.1% fee per trade (the harness's own cost model). Everything persists in localStorage; every reload revalues holdings at live prices against the benchmark of having put the whole pot into SPY on day one (price-only — the footer notes the missing ~1.2%/yr SPY dividend yield flatters the portfolio side)
