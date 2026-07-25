@@ -171,6 +171,50 @@ disclosed in the UI). Clock at disclosure date, excess vs SPY, equal weight.
   and coverage caveats ship with it. This is the literature's post-2012 null,
   reproduced on our own pipeline.
 
+### 7.1 Coverage doubled to 69% (2026-07-25) — the deflator, measured
+
+§7 named two deflators for its modestly-positive +1.20%: the priced universe was the
+most-traded large-cap slice, and delisted losers drop out. Both were stated as
+*reasons to distrust the number*, not as measured quantities. Extending price coverage
+turned them into a measurement.
+
+Adding 379 tickers of price history (287 → 666 cached, ~450 new fetches over one
+Twelve Data day) moved scored coverage from **34% → 69%** of disclosed trades
+(14,762 → 29,804 of 43,430). Nothing else changed: same corpus, same method, same
+pre-committed §6 guardrails, no re-specification.
+
+| | at 34% coverage | at 69% coverage |
+| --- | --- | --- |
+| Pooled buys, 6m excess vs SPY | +1.20% (n=7,272) | **+0.15% (n=14,466)** |
+| Buy hit rate at 6m | 50% | 47% |
+| Members clearing the 20-buy gate | 77 | 96 |
+| Members ≥95th luck percentile | 7 (chance ~4) | 6 (chance ~5) |
+| Top record vs best-of-N-random | 93rd percentile | **24th percentile** |
+
+**The deflator was real and it was most of the signal.** Belmont et al. predict
+≈ −0.26% for House buys at 6m; at honest coverage we measure +0.15% on 14,466 trades
+— a gap of 0.4pp, which is as close to reproducing a published null as this pipeline
+can get. Other horizons agree: +0.02% at 1m, +0.07% at 3m, +0.64% at 12m, with hit
+rates of 48%/48%/46%. Sells are flat too (−0.04% at 6m).
+
+The best-of-N result is the sharpest change and deserves emphasis. At 34% coverage the
+top member sat at the 93rd percentile of the best-of-77-random distribution — below the
+95th-percentile bar, but close enough to be interesting. At 69% coverage the top record
+(+14.28%) sits at the **24th percentile** of best-of-96-random, whose median is +17.31%.
+The leaderboard's best member is now *weaker* than what luck alone typically produces
+across a field this size. Split-sample decays in the same direction: the in-sample
+top decile fell 19.85% → 10.50%, 11.19% → −1.15%, and 8.00% → 1.04% out-of-sample.
+
+**Methodological lesson worth keeping.** The direction of this move was predicted in
+advance — §7 said the positive figure was survivor-tilted and would shrink with
+coverage — but the *size* was not: it took roughly 90% of the apparent edge with it.
+Any future statistic from this corpus should quote its coverage fraction alongside the
+number, because at 34% coverage this dataset said "+1.20%, modestly above the
+literature" and at 69% it says "+0.15%, the literature reproduced." The UI now prints
+the coverage percentage in the pooled footer for exactly this reason. Residual coverage
+gaps still flatter these records, since what remains unpriceable is disproportionately
+delisted — so +0.15% should be read as an upper bound, not a point estimate.
+
 ## 8. What would change our mind
 
 - **Pooled disclosed buys beating SPY at 6–12m** in our data, out-of-sample and past

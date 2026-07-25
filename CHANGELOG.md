@@ -4,6 +4,23 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.22.0] - 2026-07-25
+### Measured
+- **Congressional price coverage doubled — and the survivorship deflator turned out to be ~90% of the apparent edge.** Extending the priced universe by 379 tickers (287 → 666 cached, ~450 fetches over one Twelve Data day) moved scored coverage from **34% → 69%** of disclosed trades (14,762 → 29,804 of 43,430). Same corpus, same method, same pre-committed §6 guardrails — only coverage changed
+- **Pooled House buys at 6m fell from +1.20% (n=7,272) to +0.15% (n=14,466)**, hit rate 50% → 47%. Belmont et al. (2022) predict ≈ −0.26%; at honest coverage this pipeline now reproduces the published post-STOCK-Act null to within 0.4pp. Other horizons agree (+0.02%/+0.07%/+0.64% at 1m/3m/12m); sells flat at −0.04%
+- **The best-of-N reality check became decisive.** At 34% coverage the top member sat at the 93rd percentile of best-of-77-random — below the bar but close enough to be interesting. At 69% coverage the top record (+14.28%) sits at the **24th percentile** of best-of-96-random, whose median is +17.31%: the leaderboard's best member is now *weaker* than what luck alone routinely produces across a field this size. 6 of 96 members clear the 95th luck percentile against ~5 expected by chance. Split-sample decays the same way (19.85%→10.50%, 11.19%→−1.15%, 8.00%→1.04%)
+- Written up as `congressional-trading.md` §7.1, appended rather than rewriting §7 — the 34%-coverage record stays visible, because the *change* between the two is the finding
+
+### Changed
+- **The pooled footer now prints the coverage percentage**, since coverage is load-bearing rather than decorative: the same dataset said "+1.20%, modestly above the literature" at 34% and "+0.15%, the literature reproduced" at 69%. The footer also keeps the delisted caveat — what remains unpriceable is disproportionately delisted, so +0.15% reads as an upper bound, not a point estimate
+- `CONGRESS_RECORDS` regenerated: 78 → 96 member records, all with refreshed n, excess and luck percentiles
+
+### Notes
+- Verified in headless Chrome: constant regenerated to 2026-07-25 with pooled n=14,466 / +0.15% / 69% coverage / 96 members, the footer renders the new figures and both caveats, member notes still render with n and percentile, no NaN or undefined anywhere, no console errors
+- Standing lesson recorded in CLAUDE.md: **always quote the coverage fraction alongside any statistic from this corpus**
+
+---
+
 ## [0.21.0] - 2026-07-25
 ### Measured
 - **The displayed volatility band was checked for the first time — and it's honest.** `vol.js` had only ever measured whether EWMA *ranks* calm months ahead of wild ones (it does, 0.59 rank correlation). But the UI and the digest both assert "about 2 months in 3 land inside the band," which is a *calibration* claim about the number's SIZE — and that shipped untested. New harness experiment `server/harness/volband.js` (method and change-the-UI rule pre-committed in the file header before the first run) takes the band the UI would have printed on each past day and asks whether the next 21 trading days landed inside it
