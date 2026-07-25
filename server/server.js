@@ -479,6 +479,87 @@ app.get('/api/history/:ticker', async (req, res) => {
   }
 });
 
+// ---------- Dated closes (for the Phase 6 grading report) ----------
+// GET /api/closes/:ticker?from=YYYY-MM-DD
+//
+// /api/history deliberately throws the dates away — it returns a bare 30-number
+// sparkline, which is all a card needs. Grading a paper trade needs the opposite:
+// "what did this close at, on each day since I bought it?" So this endpoint
+// returns dated closes, oldest-first, from `from` to today.
+//
+// Why a separate endpoint instead of widening /api/history: every watchlist card
+// calls /api/history on load, and bolting ~250 dated entries onto that response
+// would multiply the payload for every ticker to serve one panel that most page
+// loads never render.
+//
+// IMPORTANT for callers: the grading code must anchor its entry price on the
+// close FROM THIS ENDPOINT, not on the Finnhub execution price stored with the
+// trade. Finnhub's free tier runs ~2% off the official close (see README's known
+// limitations); mixing the two sources would inject that gap into every measured
+// return, which at a 1-week horizon can be larger than the move being measured.
+// Same source in, same source out.
+
+const closesCache = {};
+const CLOSES_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours, same reasoning as history
+
+app.get('/api/closes/:ticker', async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+  const from = String(req.query.from || '');
+
+  if (!ticker || ticker.length > 6) {
+    return res.status(400).json({ error: 'Invalid ticker' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+    return res.status(400).json({ error: 'from must be a YYYY-MM-DD date' });
+  }
+
+  if (!TWELVE_DATA_API_KEY) {
+    return res.status(500).json({ error: 'TWELVE_DATA_API_KEY is not set on the server' });
+  }
+
+  // How many daily bars do we need to reach back to `from`? Roughly 252 trading
+  // days per 365 calendar days, plus a cushion for holidays and a few days of
+  // lead-in. Bucketed up to the next 50 so that trades made on nearby dates
+  // share one cache entry instead of each fetching its own near-identical window.
+  const spanDays = Math.max(0, (Date.now() - Date.parse(from + 'T00:00:00Z')) / 86400000);
+  const needed = Math.ceil(spanDays * 252 / 365) + 10;
+  const outputsize = Math.min(5000, Math.max(50, Math.ceil(needed / 50) * 50));
+
+  const key = `${ticker}|${outputsize}`;
+  const cached = closesCache[key];
+  if (cached && cached.expiresAt > Date.now()) {
+    return res.json({ ...cached.data, closes: cached.data.closes.filter(c => c.date >= from), cached: true });
+  }
+
+  const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=1day&outputsize=${outputsize}&apikey=${TWELVE_DATA_API_KEY}`;
+
+  try {
+    const tdResponse = await fetch(url);
+    const data = await tdResponse.json();
+
+    if (data.status === 'error' || !Array.isArray(data.values)) {
+      const msg = data.message || 'No data returned';
+      const code = data.code === 429 ? 429 : 404;
+      return res.status(code).json({ error: msg });
+    }
+
+    // Twelve Data returns newest-first; reverse to chronological so the caller
+    // can just walk forward N trading days from an entry date.
+    const closes = data.values
+      .map(v => ({ date: v.datetime, close: parseFloat(v.close) }))
+      .filter(c => Number.isFinite(c.close))
+      .reverse();
+
+    const result = { ticker, closes };
+    closesCache[key] = { data: result, expiresAt: Date.now() + CLOSES_CACHE_TTL_MS };
+
+    res.json({ ...result, closes: closes.filter(c => c.date >= from) });
+  } catch (err) {
+    console.error('Error fetching closes:', err);
+    res.status(500).json({ error: 'Failed to fetch closes' });
+  }
+});
+
 // ---------- Company news ----------
 // GET /api/news/:ticker
 // Finnhub's free tier includes company news (unlike candles). We ask for the

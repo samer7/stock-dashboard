@@ -210,6 +210,12 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   </div>
 
   <div class="feed-panel">
+    <div class="feed-title">Report card — how the dashboard's own claims are doing</div>
+    <div class="feed-sub">The forward test grading itself. Every claim below shipped with a backtest behind it; here it gets scored against what the price actually did next. Grading rules were fixed in the source before any result existed.</div>
+    <div id="grade-panel"></div>
+  </div>
+
+  <div class="feed-panel">
     <div class="feed-title">Browse by category</div>
     <div class="feed-sub">A wider view than your watchlist — tap any row for the full detail view</div>
     <div id="browse-list"></div>
@@ -1164,6 +1170,7 @@ async function paperBuy() {
   savePaper();
   paperQuotes[ticker] = q.price;
   renderPaper();
+  renderGrade(); // the graded set just changed
 }
 
 async function paperSell(ticker) {
@@ -1188,6 +1195,7 @@ async function paperSell(ticker) {
   savePaper();
   paperQuotes[ticker] = q.price;
   renderPaper();
+  renderGrade(); // the graded set just changed
 }
 
 function resetPaper() {
@@ -1195,6 +1203,7 @@ function resetPaper() {
   paper = null;
   localStorage.removeItem('paper_v1');
   renderPaper();
+  renderGrade();
 }
 
 // Refresh valuation quotes for every held ticker plus the SPY benchmark.
@@ -1354,6 +1363,12 @@ async function autoCheck(preloaded) {
     auto.log.unshift({
       date: today, fromW: Math.round(heldW * 100), toW: Math.round(targetW * 100),
       price: inp.price, forecast: inp.monthPct, target,
+      // Exact post-trade state. The grading report reconstructs this account's
+      // daily value path by replaying the log against SPY closes; storing the
+      // real cash/shares here keeps that replay exact instead of re-deriving it
+      // from the DISPLAY-rounded toW percentage. Entries logged before v0.19.0
+      // lack these fields and fall back to replay (see autoPath).
+      cash: auto.cash, shares: auto.shares,
     });
   }
   auto.lastCheck = today;
@@ -1368,6 +1383,7 @@ function resetAuto() {
   auto = null;
   localStorage.removeItem('auto_v1');
   renderAuto();
+  renderGrade();
 }
 
 function renderAuto() {
@@ -1408,6 +1424,305 @@ function renderAuto() {
       cost of the insurance) and to earn its keep in storms — the backtested pair was Sharpe 0.78 vs 0.63
       and worst drop −35% vs −55%. Whether that repeats forward is exactly what this account exists to find out.
       <a href="#" data-action="auto-reset" style="color:#aaa;">Reset</a>
+    </div>`;
+}
+
+// ---------- Grading report (Phase 6, forward test) ----------
+// This panel grades the dashboard's own shipped claims against what actually
+// happened next. It is the point of Phase 6: every number in the report card
+// came from a backtest, and a backtest cannot be wrong about the past. Only
+// this can.
+//
+// GRADING METHOD — pre-committed 2026-07-25, when the accounts were 7 days old
+// and NOTHING had matured past even the 1-week horizon. That timing is the
+// whole safeguard: the thresholds below were chosen while the outcomes were
+// still invisible, so they can't be tuned to flatter the result. Changing any
+// of them later is allowed only with the reason written down in CHANGELOG.
+//
+// WHAT GETS GRADED — one claim per shipped feature, each with its falsifier
+// already written into the research digest that shipped it:
+//
+//   1. The volatility band (docs/research/volatility.md §5.1). We display
+//      "expected swing ±X% · typical month" = one standard deviation over 21
+//      trading days, so ~2 months in 3 should land INSIDE the band. Grade:
+//      the share of matured snapshots whose realized 21-day move came in under
+//      ±swing. Pre-registered failure: coverage far below ~68% means the band
+//      is miscalibrated live (first suspect: fat tails, which make ±1σ
+//      under-cover). This is the project's first measured-positive forecast,
+//      so it is the one with the most to lose.
+//
+//   2. The signal label (docs/research/ma-timing.md §7). The harness measured
+//      that BUY/HOLD/SELL carries NO timing information — pooled BUY hit rates
+//      equal base rates. The pre-committed forward expectation is therefore a
+//      NULL: average forward returns after BUY snapshots should NOT beat those
+//      after HOLD/SELL. A confirmed null here is a success for the project's
+//      honesty, not a failure of the dashboard.
+//
+//   3. The vol-sizing rule, i.e. the 6b auto account (docs/research/
+//      risk-sizing.md §6.1). The claim is per-unit-of-risk, never "more
+//      money": it should give up some return versus 100% SPY while delivering
+//      lower realized volatility and a shallower worst drop. The pre-registered
+//      falsifier is explicit — if it gives up the return WITHOUT the risk
+//      reduction, the sizing display comes back out of the UI.
+//
+// MINIMUM SAMPLE SIZES, pre-committed. Below these, the panel shows the
+// numbers but REFUSES to call a verdict, because at small n the noise is
+// larger than any effect worth naming:
+const GRADE_MIN_BAND = 20;      // matured snapshots before judging band coverage
+const GRADE_MIN_BUCKET = 30;    // per signal bucket before comparing buckets
+const GRADE_MIN_RISK_DAYS = 126; // ~6m of trading days before judging 6b's risk
+//
+// HORIZONS in trading days, matching the harness everywhere else in the project.
+const GRADE_HORIZONS = [
+  { label: '1w', days: 5 }, { label: '1m', days: 21 },
+  { label: '3m', days: 63 }, { label: '6m', days: 126 },
+];
+
+// Cache of dated closes per ticker for the life of the page render.
+//
+// Rate limiting is reported separately from missing data, and the distinction
+// matters: Twelve Data's free tier allows only 8 requests/minute, so a grading
+// pass over several tickers can hit the ceiling on its own — and will collide
+// with anything else drawing on the same quota (the offline harness scripts
+// share it). "We couldn't ask right now" must never be displayed as "this trade
+// can't be scored", or a temporary quota blip would look like a data gap.
+const gradeCloses = {};
+let gradeRateLimited = false;
+async function fetchCloses(ticker, from) {
+  const key = `${ticker}|${from}`;
+  if (gradeCloses[key]) return gradeCloses[key];
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/closes/${ticker}?from=${from}`);
+    if (res.status === 429) { gradeRateLimited = true; return null; }
+    if (!res.ok) return null;
+    const data = await res.json();
+    gradeCloses[key] = data.closes || null;
+    return gradeCloses[key];
+  } catch (e) { return null; }
+}
+
+// Walk forward `days` TRADING days from the first close on or after `date`.
+//
+// The entry price is the close from THIS series — deliberately not the Finnhub
+// execution price stored on the trade. Finnhub's free tier sits ~2% off the
+// official close, and a 2% source mismatch would swamp the ~2% move we're
+// trying to measure at a 1-week horizon. Same source in, same source out; the
+// cost of that choice is that the graded return isn't exactly the account's
+// realized P&L, which is the right trade for a measurement.
+function forwardFrom(closes, date, days) {
+  if (!closes || !closes.length) return null;
+  const i = closes.findIndex(c => c.date >= date);
+  if (i < 0) return null;
+  const exit = closes[i + days];
+  if (!exit) return null; // horizon hasn't elapsed yet — "not yet due", not zero
+  return { ret: exit.close / closes[i].close - 1, entryDate: closes[i].date, exitDate: exit.date };
+}
+
+// Reconstruct the 6b account's daily value path by replaying its rebalance log
+// against SPY's dated closes. Between rebalances cash and shares are constant,
+// so value(t) = cash + shares * SPY(t) — which means the whole path is
+// recoverable from the log we already keep, with no extra daily bookkeeping.
+function autoPath(spyCloses) {
+  const entries = [...auto.log].reverse(); // log is newest-first; replay oldest-first
+  let cash = auto.startCash, shares = 0, li = 0;
+  const path = [];
+  for (const c of spyCloses) {
+    while (li < entries.length && entries[li].date <= c.date) {
+      const e = entries[li];
+      if (typeof e.cash === 'number' && typeof e.shares === 'number') {
+        cash = e.cash; shares = e.shares;         // exact (logged from v0.19.0 on)
+      } else {
+        // Older entries stored only the display-rounded target exposure, so
+        // re-run the rule's arithmetic to approximate the post-trade state.
+        const value = cash + shares * e.price;
+        let delta = (e.toW / 100) * value - shares * e.price;
+        if (delta > 0) delta = Math.min(delta, cash / (1 + PAPER_COST));
+        shares += delta / e.price;
+        cash -= delta + Math.abs(delta) * PAPER_COST;
+      }
+      li++;
+    }
+    path.push(cash + shares * c.close);
+  }
+  return path;
+}
+
+// Total return, annualized volatility of daily returns, and worst peak-to-trough
+// drop for a value path — the three numbers risk-sizing.md's falsifier needs.
+function pathStats(values) {
+  if (!values || values.length < 3) return null;
+  const rets = [];
+  for (let i = 1; i < values.length; i++) rets.push(values[i] / values[i - 1] - 1);
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const varc = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1);
+  let peak = values[0], mdd = 0;
+  for (const v of values) { if (v > peak) peak = v; mdd = Math.min(mdd, v / peak - 1); }
+  return {
+    total: values[values.length - 1] / values[0] - 1,
+    vol: Math.sqrt(varc) * Math.sqrt(252) * 100,
+    mdd: mdd * 100,
+    days: values.length,
+  };
+}
+
+// Roughly when a horizon comes due, for the "not yet due" messages: trading
+// days -> calendar days.
+function dueDate(fromISO, tradingDays) {
+  const d = new Date(fromISO + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + Math.round(tradingDays * 365 / 252));
+  return d.toISOString().slice(0, 10);
+}
+
+async function renderGrade() {
+  const el = document.getElementById('grade-panel');
+  const trades = (paper && paper.trades) ? paper.trades : [];
+  if (!trades.length && !auto) {
+    el.innerHTML = `<div style="font-size:13px;color:#555;line-height:1.6;">
+      Nothing to grade yet. Once the paper portfolio has trades — or the auto-follow account
+      has been running — this panel scores what the dashboard <em>said</em> at each of those
+      moments against what the price actually did next, at 1&nbsp;week / 1&nbsp;month /
+      3&nbsp;months / 6&nbsp;months. The grading rules are already fixed in the source, written
+      before any of the results existed.
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="browse-note" style="padding:6px;">Grading against actual closes…</div>`;
+  gradeRateLimited = false;
+
+  // One closes fetch per unique ticker, starting from its earliest snapshot.
+  const earliest = {};
+  for (const t of trades) {
+    if (!earliest[t.ticker] || t.date < earliest[t.ticker]) earliest[t.ticker] = t.date;
+  }
+  if (auto) earliest['SPY'] = (earliest['SPY'] && earliest['SPY'] < auto.created) ? earliest['SPY'] : auto.created;
+  const series = {};
+  for (const [tk, from] of Object.entries(earliest)) series[tk] = await fetchCloses(tk, from);
+
+  // ----- Claim 1 + 2: grade every trade snapshot at every horizon -----
+  const band = { inside: 0, n: 0 };
+  const buckets = {}; // signal label -> horizon -> array of returns
+  let pending = 0, nextDue = null, unpriced = 0;
+
+  for (const tr of trades) {
+    const closes = series[tr.ticker];
+    if (!closes || !closes.length) { unpriced++; continue; }
+    const snap = tr.snap || {};
+    for (const h of GRADE_HORIZONS) {
+      const f = forwardFrom(closes, tr.date, h.days);
+      if (!f) {
+        pending++;
+        const due = dueDate(tr.date, h.days);
+        if (!nextDue || due < nextDue) nextDue = due;
+        continue;
+      }
+      if (snap.signal) {
+        buckets[snap.signal] = buckets[snap.signal] || {};
+        (buckets[snap.signal][h.label] = buckets[snap.signal][h.label] || []).push(f.ret);
+      }
+      // The band is a 21-trading-day (1-month) claim — graded only at 1m.
+      if (h.label === '1m' && typeof snap.swing === 'number') {
+        band.n++;
+        if (Math.abs(f.ret) * 100 <= snap.swing) band.inside++;
+      }
+    }
+  }
+
+  // ----- Claim 3: the auto-follow account's risk profile -----
+  let risk = null;
+  if (auto && auto.log.length && series['SPY'] && series['SPY'].length > 2) {
+    const spy = series['SPY'].filter(c => c.date >= auto.created);
+    if (spy.length > 2) {
+      const acct = pathStats(autoPath(spy));
+      const bench = pathStats(spy.map(c => auto.startCash * (c.close / spy[0].close)));
+      if (acct && bench) risk = { acct, bench };
+    }
+  }
+
+  // ----- Render -----
+  const pct = n => `${n >= 0 ? '+' : '-'}${fmtNum(Math.abs(n), 1)}%`;
+
+  const bandRate = band.n ? (band.inside / band.n * 100) : null;
+  const bandVerdict = band.n < GRADE_MIN_BAND
+    ? `<span class="browse-note">${band.n} of ${GRADE_MIN_BAND} needed before this gets a verdict.</span>`
+    : (bandRate >= 55
+        ? `<span style="color:#1d8f4e;">Holding up — close enough to the ~68% the band promises.</span>`
+        : `<span style="color:#b83030;">Under-covering. Pre-registered next step: suspect fat tails and quote a wider quantile, not a different estimator.</span>`);
+
+  const bandHtml = `
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;font-size:13px;">1 · The volatility band <span style="font-weight:400;color:#888;">— the one forecast that measured positive</span></div>
+      <div style="font-size:12px;color:#555;line-height:1.6;">
+        Claim: the realized 1-month move lands inside ±(expected swing) about <strong>2 months in 3</strong>.<br>
+        Measured so far: <strong>${band.n ? `${band.inside} of ${band.n} inside the band (${fmtNum(bandRate, 0)}%)` : 'no matured snapshots yet'}</strong>. ${bandVerdict}
+      </div>
+    </div>`;
+
+  const sigLabels = Object.keys(buckets);
+  let sigRows = '';
+  for (const lab of sigLabels) {
+    const cells = GRADE_HORIZONS.map(h => {
+      const arr = buckets[lab][h.label];
+      if (!arr || !arr.length) return `<td style="padding:2px 10px 2px 0;color:#aaa;">—</td>`;
+      const avg = arr.reduce((a, b) => a + b, 0) / arr.length * 100;
+      return `<td style="padding:2px 10px 2px 0;">${pct(avg)} <span style="color:#aaa;">n=${arr.length}</span></td>`;
+    }).join('');
+    sigRows += `<tr><td style="padding:2px 12px 2px 0;font-weight:600;">${esc(lab)}</td>${cells}</tr>`;
+  }
+  const biggestBucket = Math.max(0, ...sigLabels.flatMap(l => GRADE_HORIZONS.map(h => (buckets[l][h.label] || []).length)));
+  const sigVerdict = biggestBucket < GRADE_MIN_BUCKET
+    ? `<span class="browse-note">Largest bucket is ${biggestBucket} of the ${GRADE_MIN_BUCKET} needed — no comparison drawn yet, and at this size none would mean anything.</span>`
+    : `<span class="browse-note">Compare the rows. The pre-committed expectation is that they look the same — the harness measured the label as carrying no timing information, and this is where that gets tested forward.</span>`;
+
+  const sigHtml = `
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;font-size:13px;">2 · The signal label <span style="font-weight:400;color:#888;">— expected to show nothing, on purpose</span></div>
+      <div style="font-size:12px;color:#555;line-height:1.6;">
+        Average forward return after each label, by horizon:
+        ${sigRows ? `<table style="font-size:12px;margin:6px 0;"><tr><td></td>${GRADE_HORIZONS.map(h => `<td style="padding:2px 10px 2px 0;color:#888;">${h.label}</td>`).join('')}</tr>${sigRows}</table>` : '<br>No matured snapshots yet.'}
+        ${sigVerdict}
+      </div>
+    </div>`;
+
+  let riskHtml = `
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:600;font-size:13px;">3 · The vol-sizing rule <span style="font-weight:400;color:#888;">— less return, less risk, or neither?</span></div>
+      <div style="font-size:12px;color:#555;line-height:1.6;">`;
+  if (!risk) {
+    riskHtml += `The auto-follow account hasn't run long enough to have a value path yet.`;
+  } else {
+    const early = risk.acct.days < GRADE_MIN_RISK_DAYS;
+    const lowerVol = risk.acct.vol < risk.bench.vol;
+    const shallower = risk.acct.mdd > risk.bench.mdd; // both negative; closer to 0 is better
+    riskHtml += `
+      Claim: <em>gives up some return, buys lower volatility and a shallower worst drop.</em><br>
+      <table style="font-size:12px;margin:6px 0;">
+        <tr><td></td><td style="padding:2px 10px 2px 0;color:#888;">return</td><td style="padding:2px 10px 2px 0;color:#888;">volatility</td><td style="padding:2px 10px 2px 0;color:#888;">worst drop</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;font-weight:600;">Vol-sized</td><td style="padding:2px 10px 2px 0;">${pct(risk.acct.total * 100)}</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.acct.vol, 1)}%</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.acct.mdd, 1)}%</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;font-weight:600;">100% SPY</td><td style="padding:2px 10px 2px 0;">${pct(risk.bench.total * 100)}</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.vol, 1)}%</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.mdd, 1)}%</td></tr>
+      </table>
+      ${early
+        ? `<span class="browse-note">${risk.acct.days} trading days in; the verdict waits for ${GRADE_MIN_RISK_DAYS} (~6 months). Volatility and drawdown are close to meaningless over a window this short — a calm month would flatter the rule and a single bad week would damn it.</span>`
+        : (lowerVol && shallower
+            ? `<span style="color:#1d8f4e;">Doing its job: lower volatility and a shallower drop. Trailing on return is the expected price, not a fault.</span>`
+            : `<span style="color:#b83030;">Falsifier territory — it is giving up return without buying the risk reduction. Per risk-sizing.md §6.1, if this persists the sizing display comes out of the UI.</span>`)}`;
+  }
+  riskHtml += `</div></div>`;
+
+  const status = [
+    `${trades.length} trade${trades.length === 1 ? '' : 's'} recorded`,
+    pending ? `${pending} horizon-checks still pending` : null,
+    nextDue ? `next one matures ~${nextDue}` : null,
+    unpriced ? (gradeRateLimited
+      ? `${unpriced} trade${unpriced === 1 ? '' : 's'} not scored yet — the price feed rate-limited us; reload in a minute`
+      : `${unpriced} trade${unpriced === 1 ? '' : 's'} unpriceable (no close data)`) : null,
+  ].filter(Boolean).join(' · ');
+
+  el.innerHTML = `${bandHtml}${sigHtml}${riskHtml}
+    <div class="browse-note" style="padding:8px 0 0;border-top:1px solid #eee;">
+      ${esc(status)}. Returns are measured close-to-close from the trade date using the same price
+      source throughout, so they won't exactly match the account's own P&amp;L — that's deliberate,
+      since mixing quote sources would inject a bigger error than the moves being measured.
+      Small samples stay unjudged by design; the thresholds were fixed before any result was visible.
     </div>`;
 }
 
@@ -1510,7 +1825,9 @@ loadCongressFavorites(); // the dynamic "Congress favorites" category
 renderPaper();           // paper portfolio (Phase 6a) — intro or holdings
 refreshPaperQuotes();    // live valuation for held tickers + SPY benchmark
 renderAuto();            // auto-follow (Phase 6b) — intro or account state
-autoCheck();             // run the sizing rule (at most once per day)
+// Grade after autoCheck so the report scores today's rebalance too, not the
+// state from before this page load.
+autoCheck().then(renderGrade).catch(renderGrade);
 </script>
 </body>
 </html>

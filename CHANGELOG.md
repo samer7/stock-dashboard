@@ -4,6 +4,20 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.19.0] - 2026-07-25
+### Added
+- **The snapshot-grading report — the forward test starts scoring itself.** A new panel that takes the `snap` records Phase 6a has been storing with every paper trade and the 6b auto-follow account's rebalance log, and grades them against what prices actually did next, at 1w/1m/3m/6m. Three claims, each with the falsifier its research digest pre-registered: the **volatility band** (realized 1-month move should land inside ±1σ about 2 months in 3 — `volatility.md` §5.1), the **signal label** (expected to show *nothing*; a confirmed null is the honest outcome — `ma-timing.md` §7), and the **vol-sizing rule** (must give up return *and* deliver lower vol plus a shallower drop, or the sizing display comes back out — `risk-sizing.md` §6.1)
+- **The grading rules were pre-committed today, while the accounts were 7 days old and not one horizon had matured** — written into the `renderGrade` header block and `docs/research/README.md` before any result was visible, which is the only thing that stops thresholds being tuned to flatter the outcome. Minimum samples below which the panel shows numbers but refuses a verdict: 20 matured snapshots for band coverage, 30 per signal bucket, 126 trading days for the sizing account's risk stats
+- `GET /api/closes/:ticker?from=YYYY-MM-DD` — dated closes, oldest-first, 6h cache bucketed by window size so trades on nearby dates share one entry. Kept separate from `/api/history` deliberately: every card calls that endpoint on load, and attaching ~250 dated entries to it would multiply the payload for every ticker to serve one panel most page loads never render
+- The 6b rebalance log now stores post-trade `cash`/`shares`, making the account's daily value path replay exactly; older entries fall back to re-running the rule's arithmetic from the display-rounded exposure
+
+### Notes
+- **Returns are measured close-to-close from a single price source, not from the recorded execution price.** The free-tier quote feed runs ~2% off the official close; at a 1-week horizon that gap is larger than the move being measured, so the graded return deliberately isn't the account's exact P&L
+- Rate-limit exhaustion is reported as "not scored yet — reload in a minute", never as missing data. Twelve Data's free tier allows 8 requests/minute, and a grading pass shares that budget with the offline harness scripts — during development this run visibly rate-limited a concurrent `congresstrack.js` fetch
+- Verified in headless Chrome against a local backend with seeded aged trades: band coverage, per-label buckets, the risk table and its verdict, small-n refusals, pending-horizon tracking with a next-maturity date, the empty state, and the legacy log-replay path; no console errors, 6a/6b panels unaffected
+
+---
+
 ## [0.18.0] - 2026-07-18
 ### Added
 - **Phase 6b: the auto-follow account — the measured sizing rule, running itself.** A second fake-money account that mechanically holds SPY at `min(1, normal vol / forecast vol)` — the exact rule `voltarget.js` measured positive — with the same parameters as the backtest (5pp rebalance band, 0.1% cost on traded dollars, the frozen ±3.9% SPY target, live EWMA forecast from `/api/history/SPY`). No human decisions: the rule is evaluated on page load, at most once per calendar day (honestly documented — a static site has no scheduler, and the measured turnover is ~2 rebalances/year, so visit-driven checking loses almost nothing). It can only ever de-risk; the panel says plainly to expect it to trail 100%-SPY in calm markets and earn its keep in storms — the forward run is the rule's real exam

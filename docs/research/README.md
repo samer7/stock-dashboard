@@ -254,6 +254,37 @@ Queued topics (in order):
   forward test gets the final word (Cederburg's warning stands). **Phase 5d is
   closed.**
 
+## The forward test (Phase 6) — grading method pre-committed 2026-07-25
+
+Every verdict above came from a backtest, and a backtest cannot be surprised by the
+past. Phase 6 runs the shipped claims forward on live prices instead, and the
+**grading rules were fixed on 2026-07-25 — while the paper accounts were 7 days old
+and not one horizon had matured.** That timing is the entire safeguard: rules chosen
+before any outcome is visible cannot be tuned to flatter the result. The method lives
+in the `renderGrade` header block in `index.html` (the grading runs in the browser
+because the trade snapshots live in `localStorage`), and it grades exactly the
+falsifiers the digests already pre-registered:
+
+| Claim | Pre-registered falsifier | Where it was written first |
+| --- | --- | --- |
+| Volatility band: realized 1-month move lands inside ±1σ about 2 months in 3 | Coverage far below ~68% ⇒ miscalibrated live; suspect fat tails and quote a wider quantile, *not* a different estimator | [volatility.md](volatility.md) §5.1 |
+| Signal label carries no timing information | The forward expectation is a **null** — BUY snapshots should not beat HOLD/SELL. A confirmed null is a success for the project's honesty | [ma-timing.md](ma-timing.md) §7 |
+| Vol-sizing: gives up return, buys lower vol and a shallower worst drop | Return given up **without** the risk reduction ⇒ the sizing display comes back out of the UI | [risk-sizing.md](risk-sizing.md) §6.1 |
+
+Pre-committed minimum sample sizes, below which the panel shows the numbers but
+refuses a verdict: **20** matured snapshots for band coverage, **30** per signal
+bucket before buckets are compared, **126 trading days (~6m)** before the sizing
+account's volatility and drawdown are judged. Horizons are the project's usual
+1w/1m/3m/6m in trading days. Returns are measured close-to-close from a single price
+source rather than from the recorded execution price — the free-tier quote feed runs
+~2% off the official close, which at a 1-week horizon would be a larger error than
+the move being measured.
+
+Supporting endpoint: `GET /api/closes/:ticker?from=YYYY-MM-DD` (dated closes,
+oldest-first). The 6b account's daily value path needs no extra bookkeeping — between
+rebalances cash and shares are constant, so the whole path replays from the existing
+rebalance log against SPY closes.
+
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),
 [volatility.md](volatility.md), [calibration.md](calibration.md),
