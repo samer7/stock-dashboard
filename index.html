@@ -205,7 +205,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 
   <div class="feed-panel">
     <div class="feed-title">Auto-follow — the measured sizing rule, running itself</div>
-    <div class="feed-sub">Phase 6b: a second fake-money account that mechanically holds SPY at the vol-sized exposure — the one rule that measured positive in our backtests. No human decisions; the forward run is the rule's real exam.</div>
+    <div class="feed-sub">Phase 6b: a second fake-money account that runs by itself — it picks how much of one stock to hold based on how choppy that stock looks, never on which way it might go. The one rule that measured positive in our backtests, now taking its real exam.</div>
     <div id="auto-panel"></div>
   </div>
 
@@ -1310,12 +1310,29 @@ const AUTO_BAND = 0.05;
 
 function saveAuto() { localStorage.setItem('auto_v1', JSON.stringify(auto)); }
 
-// Live inputs for the rule: SPY quote + SPY EWMA forecast (server-cached).
-async function autoInputs() {
-  const q = await fetchQuote('SPY');
+// Which ticker is this account running on? Accounts created before v0.20.0
+// predate the choice and were all SPY.
+function autoTicker() { return (auto && auto.ticker) || 'SPY'; }
+
+// The rule can only run on a ticker whose "normal" volatility we actually
+// measured — that target is the expanding median of ~19 years of the ticker's
+// own EWMA vol, computed offline by voltarget.js and frozen into
+// HARNESS_RESULTS. For anything outside the measured basket we'd have to invent
+// a normal, which is exactly the kind of unmeasured number this project doesn't
+// ship. So the picker offers the 18 measured names and says why.
+function autoChoices() {
+  return Object.entries(HARNESS_RESULTS.tickers)
+    .filter(([, r]) => r.vt && typeof r.vt.target === 'number')
+    .map(([t, r]) => ({ ticker: t, ...r.vt }));
+}
+
+// Live inputs for the rule: quote + EWMA forecast for the chosen ticker.
+async function autoInputs(ticker) {
+  const t = ticker || autoTicker();
+  const q = await fetchQuote(t);
   let monthPct = null;
   try {
-    const res = await fetch(`${BACKEND_URL}/api/history/SPY`);
+    const res = await fetch(`${BACKEND_URL}/api/history/${t}`);
     if (res.ok) {
       const h = await res.json();
       if (h.volatility && typeof h.volatility.monthPct === 'number') monthPct = h.volatility.monthPct;
@@ -1326,15 +1343,19 @@ async function autoInputs() {
 
 async function startAuto() {
   const el = document.getElementById('auto-msg');
-  if (el) el.textContent = 'Fetching SPY price and volatility forecast…';
-  const inp = await autoInputs();
+  const sel = document.getElementById('auto-ticker');
+  const ticker = (sel && sel.value) || 'SPY';
+  if (el) el.textContent = `Fetching ${ticker} price and volatility forecast…`;
+  const inp = await autoInputs(ticker);
   if (!inp) {
-    if (el) el.textContent = 'Couldn’t fetch SPY data — the backend may still be waking up. Try again in ~30s.';
+    if (el) el.textContent = `Couldn’t fetch ${ticker} data — the backend may still be waking up. Try again in ~30s.`;
     return;
   }
   auto = {
     created: new Date().toISOString().slice(0, 10),
+    ticker,
     startCash: 10000, cash: 10000, shares: 0,
+    // Price on day one, used for the "just hold it the whole time" benchmark.
     spyStart: inp.price, lastCheck: null, log: [],
   };
   saveAuto();
@@ -1349,7 +1370,7 @@ async function autoCheck(preloaded) {
   if (auto.lastCheck === today && !firstTrade) { renderAuto(); return; } // one check per day
   const inp = preloaded || await autoInputs();
   if (!inp) { renderAuto(); return; } // can't price today — keep holding, try next visit
-  const target = HARNESS_RESULTS.tickers.SPY.vt.target;
+  const target = HARNESS_RESULTS.tickers[autoTicker()].vt.target;
   const targetW = Math.min(1, target / inp.monthPct);
   const value = auto.cash + auto.shares * inp.price;
   const heldW = (auto.shares * inp.price) / value;
@@ -1379,7 +1400,7 @@ async function autoCheck(preloaded) {
 }
 
 function resetAuto() {
-  if (!confirm('Wipe the auto-follow account and its rebalance log?')) return;
+  if (!confirm('Wipe the auto-follow account and its rebalance log? You can then start a new one on a different stock.')) return;
   auto = null;
   localStorage.removeItem('auto_v1');
   renderAuto();
@@ -1389,41 +1410,93 @@ function resetAuto() {
 function renderAuto() {
   const el = document.getElementById('auto-panel');
   if (!auto) {
+    // Options are labelled with each ticker's own measured outcome, including
+    // the two where the rule did WORSE than simply holding — hiding those would
+    // turn a picker into a recommendation.
+    const opts = autoChoices().map(c => {
+      const verdict = c.sharpe > c.bhSharpe ? 'better' : (c.sharpe < c.bhSharpe ? 'WORSE' : 'no better');
+      return `<option value="${esc(c.ticker)}"${c.ticker === 'SPY' ? ' selected' : ''}>${esc(c.ticker)} — normal swing ±${c.target}%/mo · measured ${verdict} than holding</option>`;
+    }).join('');
     el.innerHTML = `
       <div style="font-size:13px;color:#555;line-height:1.6;">
-        In ~19 years of backtests, holding SPY at <em>min(1, normal&nbsp;vol&nbsp;/&nbsp;forecast&nbsp;vol)</em> —
-        trimming only when volatility runs above its own norm, never guessing direction — improved
-        return-per-risk and cut the worst drop nearly in half. This account runs that rule with no
-        human input. Forward, live, in the open: if the measured edge is real, it shows up here.
+        <strong>A second fake-money account that trades itself.</strong> It's separate from the paper
+        portfolio above — its own $10,000, no connection to yours.
+        <br><br>
+        It holds <strong>one</strong> stock or fund, which you choose below. The only decision it ever
+        makes is <strong>how much</strong> of its $10,000 to have in the market, versus sitting in cash.
+        It never tries to guess whether prices will go up — nothing we tested could predict that.
+        <br><br>
+        Instead it uses the one thing that <em>did</em> measure as predictable: <strong>how choppy the
+        next month is likely to be.</strong> Every stock has a "normal" amount of bounce. When things
+        look calmer than normal, the account holds everything. When they look twice as choppy as
+        normal, it holds half and puts the rest in cash. It can only ever reduce — it never borrows.
+        <br><br>
+        <span style="color:#888;">What to expect: it will usually <em>trail</em> simply holding the stock
+        in calm, rising markets. That's the premium it pays. Its value shows up in crashes — in ~19 years
+        of backtests it cut the worst drop roughly in half. Whether that repeats forward is the whole
+        point of running it live.</span>
       </div>
-      <div class="paper-form"><button class="paper-btn" data-action="auto-start">Start the machine with $10,000 (fake)</button></div>
+      <div class="paper-form">
+        <select id="auto-ticker" style="padding:6px;font-size:13px;max-width:100%;">${opts}</select>
+        <button class="paper-btn" data-action="auto-start">Start with $10,000 (fake)</button>
+      </div>
+      <div class="browse-note" style="padding:2px 0 0;">
+        Only these 18 are offered: the rule needs a stock's <em>measured</em> normal choppiness, worked
+        out from ~19 years of its own history. For anything else we'd have to make that number up.
+      </div>
       <div class="paper-msg" id="auto-msg"></div>`;
     return;
   }
+  const tk = autoTicker();
   const price = auto.lastPrice, forecast = auto.lastForecast;
   const value = auto.cash + auto.shares * (price || 0);
   const heldW = value > 0 && price ? (auto.shares * price) / value : 0;
   const bench = price ? auto.startCash * (price / auto.spyStart) : null;
   const diff = bench === null ? null : value - bench;
-  const target = HARNESS_RESULTS.tickers.SPY.vt.target;
+  const vt = HARNESS_RESULTS.tickers[tk].vt;
+  const target = vt.target;
   const log = auto.log.slice(0, 6).map(r =>
-    `<div>${esc(r.date)} · exposure ${r.fromW}% → <strong>${r.toW}%</strong> @ $${fmtNum(r.price)} · forecast ±${r.forecast.toFixed(1)}% vs norm ±${r.target}%</div>`
+    `<div>${esc(r.date)} · in the market ${r.fromW}% → <strong>${r.toW}%</strong> @ $${fmtNum(r.price)} · expected bounce ±${r.forecast.toFixed(1)}% vs normal ±${r.target}%</div>`
   ).join('');
+
+  // Plain-language reading of where the rule stands right now.
+  //
+  // Careful distinction: what the rule CALLS FOR today and what the account is
+  // actually HOLDING are different numbers, and they're allowed to differ by up
+  // to the 5pp band before it trades. Saying "the account has trimmed to 75%"
+  // would assert a trade that may not have happened.
+  let stance = '';
+  if (price && forecast) {
+    const wantW = Math.round(Math.min(1, target / forecast) * 100);
+    const heldPct = Math.round(heldW * 100);
+    const mood = forecast <= target
+      ? `${esc(tk)} looks <strong>calmer than normal</strong> right now (expected bounce ±${forecast.toFixed(1)}% vs its normal ±${target}%), so the rule wants everything it's allowed: <strong>${wantW}% in the market</strong>.`
+      : `${esc(tk)} looks <strong>choppier than normal</strong> right now (expected bounce ±${forecast.toFixed(1)}% vs its normal ±${target}%), so the rule wants only <strong>${wantW}% in the market</strong>, with the rest in cash.`;
+    const drift = Math.abs(wantW - heldPct) > AUTO_BAND * 100
+      ? ` The account is holding ${heldPct}%, so it will move to ${wantW}% on its next daily check.`
+      : (wantW === heldPct ? '' : ` The account is holding ${heldPct}% — close enough that it leaves it alone rather than pay to trade.`);
+    stance = mood + drift;
+  }
+  const rideOut = vt.sharpe > vt.bhSharpe
+    ? `On ${tk}'s own ~19 years, this rule earned more per unit of risk than just holding it (${vt.sharpe} vs ${vt.bhSharpe}) and its worst drop was ${vt.dd}% instead of ${vt.bhDD}%.`
+    : `Worth knowing: on ${tk}'s own ~19 years this rule measured <strong>no better than simply holding it</strong> (${vt.sharpe} vs ${vt.bhSharpe} per unit of risk), though its worst drop was still shallower (${vt.dd}% vs ${vt.bhDD}%). It's shown here because hiding the misses would make the measured wins meaningless.`;
+
   el.innerHTML = `
     <div class="metrics-row">
       <div class="metric"><div class="metric-label">Total value</div><div class="metric-value">$${fmtNum(value)}</div></div>
-      <div class="metric"><div class="metric-label">SPY exposure now</div><div class="metric-value">${Math.round(heldW * 100)}%</div></div>
-      <div class="metric"><div class="metric-label">vs 100% SPY always</div><div class="metric-value" style="color:${diff === null ? '#888' : diff >= 0 ? '#1d8f4e' : '#b83030'};">${diff === null ? '—' : `${diff >= 0 ? '+' : '-'}$${fmtNum(Math.abs(diff))}`}</div></div>
+      <div class="metric"><div class="metric-label">In the market now</div><div class="metric-value">${Math.round(heldW * 100)}% ${esc(tk)}</div></div>
+      <div class="metric"><div class="metric-label">vs just holding ${esc(tk)}</div><div class="metric-value" style="color:${diff === null ? '#888' : diff >= 0 ? '#1d8f4e' : '#b83030'};">${diff === null ? '—' : `${diff >= 0 ? '+' : '-'}$${fmtNum(Math.abs(diff))}`}</div></div>
       <div class="metric"><div class="metric-label">Since</div><div class="metric-value">${esc(auto.created)}</div></div>
     </div>
-    <div style="font-size:12px;color:#555;">Rule: hold min(1, ±${target}% ÷ current forecast${forecast ? ` ±${forecast.toFixed(1)}%` : ''}) of SPY · checked on page load, at most daily · rebalances only past a 5pp band · 0.1% cost on traded dollars.</div>
+    ${stance ? `<div style="font-size:13px;color:#555;line-height:1.6;">${stance}</div>` : ''}
+    <div style="font-size:12px;color:#888;">It re-checks once a day when you open the page, and only actually trades if the right amount has drifted more than 5 percentage points from what it's holding — about twice a year, historically. Each trade costs 0.1%.</div>
     <div class="paper-msg" id="auto-msg"></div>
     ${log ? `<div class="paper-log">${log}</div>` : ''}
     <div class="browse-note" style="padding:8px 0 0;">
-      Fake money, not advice. Expect this to TRAIL 100%-SPY in calm rising markets (that's the measured
-      cost of the insurance) and to earn its keep in storms — the backtested pair was Sharpe 0.78 vs 0.63
-      and worst drop −35% vs −55%. Whether that repeats forward is exactly what this account exists to find out.
-      <a href="#" data-action="auto-reset" style="color:#aaa;">Reset</a>
+      Fake money, not advice. Expect it to trail just-holding-${esc(tk)} while markets are calm — that's
+      the cost of the insurance, not a fault. ${rideOut}
+      Whether it repeats forward is exactly what this account exists to find out.
+      <a href="#" data-action="auto-reset" style="color:#aaa;">Reset / pick a different one</a>
     </div>`;
 }
 
@@ -1594,7 +1667,8 @@ async function renderGrade() {
   for (const t of trades) {
     if (!earliest[t.ticker] || t.date < earliest[t.ticker]) earliest[t.ticker] = t.date;
   }
-  if (auto) earliest['SPY'] = (earliest['SPY'] && earliest['SPY'] < auto.created) ? earliest['SPY'] : auto.created;
+  const autoTk = auto ? autoTicker() : null;
+  if (autoTk) earliest[autoTk] = (earliest[autoTk] && earliest[autoTk] < auto.created) ? earliest[autoTk] : auto.created;
   const series = {};
   for (const [tk, from] of Object.entries(earliest)) series[tk] = await fetchCloses(tk, from);
 
@@ -1629,11 +1703,11 @@ async function renderGrade() {
 
   // ----- Claim 3: the auto-follow account's risk profile -----
   let risk = null;
-  if (auto && auto.log.length && series['SPY'] && series['SPY'].length > 2) {
-    const spy = series['SPY'].filter(c => c.date >= auto.created);
-    if (spy.length > 2) {
-      const acct = pathStats(autoPath(spy));
-      const bench = pathStats(spy.map(c => auto.startCash * (c.close / spy[0].close)));
+  if (autoTk && auto.log.length && series[autoTk] && series[autoTk].length > 2) {
+    const base = series[autoTk].filter(c => c.date >= auto.created);
+    if (base.length > 2) {
+      const acct = pathStats(autoPath(base));
+      const bench = pathStats(base.map(c => auto.startCash * (c.close / base[0].close)));
       if (acct && bench) risk = { acct, bench };
     }
   }
@@ -1698,7 +1772,7 @@ async function renderGrade() {
       <table style="font-size:12px;margin:6px 0;">
         <tr><td></td><td style="padding:2px 10px 2px 0;color:#888;">return</td><td style="padding:2px 10px 2px 0;color:#888;">volatility</td><td style="padding:2px 10px 2px 0;color:#888;">worst drop</td></tr>
         <tr><td style="padding:2px 12px 2px 0;font-weight:600;">Vol-sized</td><td style="padding:2px 10px 2px 0;">${pct(risk.acct.total * 100)}</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.acct.vol, 1)}%</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.acct.mdd, 1)}%</td></tr>
-        <tr><td style="padding:2px 12px 2px 0;font-weight:600;">100% SPY</td><td style="padding:2px 10px 2px 0;">${pct(risk.bench.total * 100)}</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.vol, 1)}%</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.mdd, 1)}%</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;font-weight:600;">100% ${esc(autoTk)}</td><td style="padding:2px 10px 2px 0;">${pct(risk.bench.total * 100)}</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.vol, 1)}%</td><td style="padding:2px 10px 2px 0;">${fmtNum(risk.bench.mdd, 1)}%</td></tr>
       </table>
       ${early
         ? `<span class="browse-note">${risk.acct.days} trading days in; the verdict waits for ${GRADE_MIN_RISK_DAYS} (~6 months). Volatility and drawdown are close to meaningless over a window this short — a calm month would flatter the rule and a single bad week would damn it.</span>`

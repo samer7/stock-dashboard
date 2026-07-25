@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.20.0] - 2026-07-25
+### Changed
+- **The auto-follow account can now run on any of the 18 measured tickers, not just SPY** (owner-requested). A picker on the start screen lists each one with its own measured normal swing and outcome; the account stores its choice, and every number downstream — exposure, benchmark, rebalance log, and the grading report's risk table — follows the chosen ticker instead of assuming SPY. Accounts created before this default to SPY and keep working unchanged
+- **The picker labels the two tickers where the rule measured WORSE than simply holding** (XOM, INTC) rather than quietly offering them as equals — a picker that hid its misses would turn measurement into a recommendation. Selecting one shows that verdict in the running panel too
+- **Only the 18 measured names are offered, and the panel says why:** the rule needs a ticker's *measured* normal volatility (the expanding median of ~19 years of its own EWMA vol, frozen by `voltarget.js`). For anything else we'd have to invent that number, which is exactly what this project doesn't ship
+- **Rewrote the auto-follow panel in plain language** after the owner reported the UI was unreadable. The intro led with `min(1, normal vol / forecast vol)`; it now explains that it's a separate account, that it only decides *how much* to hold and never *which way* prices will go, and what "twice as choppy as normal ⇒ hold half" means — plus an explicit "expect it to trail in calm markets; that's the premium, not a fault"
+- The running panel now states the rule's current stance in words, carefully distinguishing **what the rule calls for** from **what the account is actually holding** — those legitimately differ by up to the 5pp rebalance band, and the previous phrasing would have asserted a trade that hadn't happened
+
+### Notes
+- Verified in headless Chrome: the picker's 18 options and their labels, starting on a non-SPY ticker (exposure, stance, benchmark and the grading report's risk row all follow it), the want-vs-held wording under drift, and the migration path for accounts with no stored ticker. No console errors
+
+---
+
 ## [0.19.0] - 2026-07-25
 ### Added
 - **The snapshot-grading report — the forward test starts scoring itself.** A new panel that takes the `snap` records Phase 6a has been storing with every paper trade and the 6b auto-follow account's rebalance log, and grades them against what prices actually did next, at 1w/1m/3m/6m. Three claims, each with the falsifier its research digest pre-registered: the **volatility band** (realized 1-month move should land inside ±1σ about 2 months in 3 — `volatility.md` §5.1), the **signal label** (expected to show *nothing*; a confirmed null is the honest outcome — `ma-timing.md` §7), and the **vol-sizing rule** (must give up return *and* deliver lower vol plus a shallower drop, or the sizing display comes back out — `risk-sizing.md` §6.1)
