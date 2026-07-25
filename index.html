@@ -198,14 +198,14 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
   </div>
 
   <div class="feed-panel">
-    <div class="feed-title">Paper portfolio — fake money, real prices</div>
-    <div class="feed-sub">Phase 6 of the project: test the dashboard's numbers forward, in the open. Live prices, 0.1% cost per trade, benchmarked against simply buying SPY on day one.</div>
+    <div class="feed-title">Paper portfolio — <em>you</em> pick the trades</div>
+    <div class="feed-sub"><strong>This is the hands-on one: you choose what to buy and when to sell.</strong> Phase 6 of the project: test the dashboard's numbers forward, in the open. Live prices, 0.1% cost per trade, benchmarked against simply buying SPY on day one.</div>
     <div id="paper-panel"></div>
   </div>
 
   <div class="feed-panel">
-    <div class="feed-title">Auto-follow — the measured sizing rule, running itself</div>
-    <div class="feed-sub">Phase 6b: a second fake-money account that runs by itself — it picks how much of one stock to hold based on how choppy that stock looks, never on which way it might go. The one rule that measured positive in our backtests, now taking its real exam.</div>
+    <div class="feed-title">Auto-follow — it trades <em>itself</em>, you just watch</div>
+    <div class="feed-sub"><strong>Nothing to click here by design — a human making decisions would ruin what it's testing.</strong> Phase 6b: a second fake-money account that runs by itself — it picks how much of one stock to hold based on how choppy that stock looks, never on which way it might go. The one rule that measured positive in our backtests, now taking its real exam.</div>
     <div id="auto-panel"></div>
   </div>
 
@@ -1220,13 +1220,28 @@ async function refreshPaperQuotes() {
 function renderPaper() {
   const el = document.getElementById('paper-panel');
   if (!paper) {
+    // The controls are shown disabled rather than hidden: with them hidden this
+    // panel was a wall of text and a single button, so it read as having no
+    // features at all. Seeing the greyed-out form answers "what do I get?"
+    // before committing.
     el.innerHTML = `
       <div style="font-size:13px;color:#555;line-height:1.6;">
-        Start a fake-money account and trade at real live prices. Every trade also records
-        what this dashboard was saying at that moment — the signal, the expected swing, the
-        vol-sized exposure — so its claims get graded in the open, forward, where backtests can't help them.
+        <strong>You make the calls here.</strong> Start a fake-money account and trade at real live
+        prices — type a ticker and a dollar amount to buy, sell any holding with one click.
+        <br><br>
+        Every trade also records what this dashboard was saying at that moment — the signal, the
+        expected swing, the vol-sized exposure — so its claims get graded in the open, forward,
+        where backtests can't help them.
       </div>
-      <div class="paper-form"><button class="paper-btn" data-action="paper-start">Start with $10,000 (fake)</button></div>
+      <div style="opacity:0.45;pointer-events:none;" aria-hidden="true">
+        <div class="paper-form">
+          <input placeholder="Ticker" maxlength="6" disabled>
+          <input placeholder="$ amount" type="number" disabled>
+          <button class="paper-btn" disabled>Buy at live price</button>
+        </div>
+      </div>
+      <div class="browse-note" style="padding:0 0 8px;">↑ These unlock once you start.</div>
+      <div class="paper-form"><button class="paper-btn" data-action="paper-start">Start the manual account — $10,000 (fake)</button></div>
       <div class="paper-msg" id="paper-msg"></div>`;
     return;
   }
@@ -1438,7 +1453,7 @@ function renderAuto() {
       </div>
       <div class="paper-form">
         <select id="auto-ticker" style="padding:6px;font-size:13px;max-width:100%;">${opts}</select>
-        <button class="paper-btn" data-action="auto-start">Start with $10,000 (fake)</button>
+        <button class="paper-btn" data-action="auto-start">Start the automatic account — $10,000 (fake)</button>
       </div>
       <div class="browse-note" style="padding:2px 0 0;">
         Only these 18 are offered: the rule needs a stock's <em>measured</em> normal choppiness, worked

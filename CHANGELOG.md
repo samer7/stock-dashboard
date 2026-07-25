@@ -4,6 +4,19 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.20.1] - 2026-07-25
+### Fixed
+- **Both Phase 6 panels had an identically-labelled "Start with $10,000 (fake)" button.** v0.20.0 shortened the auto-follow button while rewriting that panel's copy and collided with the paper portfolio's. The owner hit exactly the predictable outcome — starting the automatic account while intending the manual one. They now read "Start the **manual** account" and "Start the **automatic** account"
+
+### Changed
+- **The paper portfolio now previews its controls in the intro state**, greyed out and inert, above the line "↑ These unlock once you start." Previously every control was hidden until the account existed, so the panel was a wall of text and one button and read as having no features at all. The preview carries no `id` attributes, so it can't collide with the real inputs once they render
+- **Each panel now leads with a one-line statement of how you're meant to use it** — "This is the hands-on one: you choose what to buy and when to sell" versus "Nothing to click here by design — a human making decisions would ruin what it's testing." Titles differentiate too: "*you* pick the trades" / "it trades *itself*, you just watch." The auto-follow panel having almost no controls is intentional, but nothing on the page said so
+
+### Notes
+- Verified in headless Chrome against the live backend: both start buttons present and distinct, the three previewed controls disabled with no id collision, clicking the greyed button cannot create an account, both contrast lines render, and the real inputs take over cleanly after starting with no leftover disabled elements. No console errors
+
+---
+
 ## [0.20.0] - 2026-07-25
 ### Changed
 - **The auto-follow account can now run on any of the 18 measured tickers, not just SPY** (owner-requested). A picker on the start screen lists each one with its own measured normal swing and outcome; the account stores its choice, and every number downstream — exposure, benchmark, rebalance log, and the grading report's risk table — follows the chosen ticker instead of assuming SPY. Accounts created before this default to SPY and keep working unchanged
