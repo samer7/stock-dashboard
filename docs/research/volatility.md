@@ -110,12 +110,81 @@ volatility layer that calibrated probability bands (5b proper) will be built on.
    miscalibrated in practice — investigate before trusting it further (first suspect:
    fat tails, which make ±1σ under-cover; the fix is quoting a wider quantile, not a
    different estimator).
+   **→ Measured 2026-07-25 in §6: the band is well calibrated (68.8% vs 68.3%
+   theory), and the parenthetical above is wrong about where fat tails bite — see
+   §6.3. This falsifier is retained for the forward test, but the historical prior
+   is now strong.**
 2. **GARCH(1,1) fitted per ticker via `walkforward.js`** materially beating EWMA
    out-of-sample on this basket would justify the added complexity. The literature
    predicts a modest gain at most; test before believing.
 3. **Horizon creep**: nothing here licenses volatility forecasts beyond ~1–2 months
    (Poon & Granger's forecastability horizon). If a future feature wants quarterly
    bands, re-run `vol.js --horizon=63` first and expect worse.
+
+## 6. Is the band the right *size*? (2026-07-25, `volband.js`)
+
+§3 established that EWMA **orders** calm months ahead of wild ones (0.59 median rank
+correlation, beating both baselines 18/18). That is a claim about ranking, and it says
+nothing about whether the number we print is the right size. Yet the UI and §4 both
+assert "about 2 months in 3 land inside the band" — a *calibration* claim that went
+out untested. `server/harness/volband.js` tests it, with the method and the
+change-the-UI rule pre-committed in the file's header before the first run.
+
+### 6.1 Method
+
+For every day with an EWMA value and a resolvable outcome (252-day warmup, matching
+`vol.js`), take the band the UI would have printed that day — `ewma[t] × √21` — and
+ask whether the next 21 trading days' move landed inside it. Nothing is fitted:
+λ = 0.94 is J.P. Morgan's 1996 constant and each day's band uses only prior returns,
+so there is no in-sample to leak (the same argument §3 makes).
+
+The headline uses **non-overlapping** samples — every 21st day only. Consecutive days
+share 20 of their 21 outcome days, so overlapping windows are massively autocorrelated
+and would overstate precision by roughly 21×. Realized moves are reported both in log
+terms (internally consistent with the log-return vol estimate) and simple terms (what
+a reader actually understands "±7%" to mean); they agree to within 0.1pp throughout.
+
+### 6.2 Verdict: the claim is accurate
+
+Pooled over **4,068 non-overlapping ticker-months** (18 tickers, ~19 years each):
+
+| | measured | normal theory |
+| --- | --- | --- |
+| inside ±1σ | **68.8%** | 68.3% |
+| inside ±2σ | 94.0% | 95.4% |
+
+Per-ticker median 69.5%, range 60.2%–73.0%; **17 of 18 tickers land inside the
+pre-committed 63–73% acceptance range**, AAPL being the lone exception at 60.2%.
+Robust to every ablation tried: 68.4% on total-return prices, 70.3% at a 1-week
+horizon, 70.6% at λ = 0.97.
+
+Per the pre-committed rule, the UI sentence stands exactly as written — the first time
+a pre-committed check in this project has come back "no action needed." Worth stating
+plainly: this is a **confirmation of a shipped number**, not a new edge. It says the
+band is honest, not that it is profitable.
+
+### 6.3 Correction to §5.1
+
+§5.1 named fat tails as the first suspect if coverage came in low, on the reasoning
+that fat tails make ±1σ under-cover. The data says that diagnosis was aimed at the
+wrong place. At ±1σ the band is essentially perfect (68.8% vs 68.3%); the deviation
+appears only at ±2σ, which covers 94.0% against 95.4% expected. So the fat tails are
+real, but they live in the **extremes** and are invisible at the 1σ band the UI
+actually displays.
+
+The general point is worth keeping: for a symmetric fat-tailed distribution, mass
+concentrates near zero while rare extremes inflate σ, so ±1σ tends to **over**-cover
+while ±2σ **under**-covers. The measured 68.8% / 94.0% pair is exactly that signature,
+mild enough at 1σ to be invisible. Anyone extending this work to wider quantiles
+should expect the normal approximation to degrade as they go out, not improve.
+
+### 6.4 What this does and doesn't license
+
+Nothing here extends the horizon (§5.3 still binds — no quarterly bands without
+re-running the test), and nothing here says anything about direction. It licenses
+exactly one sentence: the ±1σ monthly band we display is the size we say it is. The
+Phase 6 forward test in the UI still runs as pre-registered — a historical measurement,
+however large its sample, is not a live one.
 
 ## References
 

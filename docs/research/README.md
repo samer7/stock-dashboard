@@ -267,7 +267,7 @@ falsifiers the digests already pre-registered:
 
 | Claim | Pre-registered falsifier | Where it was written first |
 | --- | --- | --- |
-| Volatility band: realized 1-month move lands inside ±1σ about 2 months in 3 | Coverage far below ~68% ⇒ miscalibrated live; suspect fat tails and quote a wider quantile, *not* a different estimator | [volatility.md](volatility.md) §5.1 |
+| Volatility band: realized 1-month move lands inside ±1σ about 2 months in 3 | Coverage far below ~68% ⇒ miscalibrated live; suspect fat tails and quote a wider quantile, *not* a different estimator | [volatility.md](volatility.md) §5.1 — **historical prior now measured, see below** |
 | Signal label carries no timing information | The forward expectation is a **null** — BUY snapshots should not beat HOLD/SELL. A confirmed null is a success for the project's honesty | [ma-timing.md](ma-timing.md) §7 |
 | Vol-sizing: gives up return, buys lower vol and a shallower worst drop | Return given up **without** the risk reduction ⇒ the sizing display comes back out of the UI | [risk-sizing.md](risk-sizing.md) §6.1 |
 
@@ -284,6 +284,18 @@ Supporting endpoint: `GET /api/closes/:ticker?from=YYYY-MM-DD` (dated closes,
 oldest-first). The 6b account's daily value path needs no extra bookkeeping — between
 rebalances cash and shares are constant, so the whole path replays from the existing
 rebalance log against SPY closes.
+
+**Historical check on the band (2026-07-25, `volband.js`, [volatility.md](volatility.md) §6):**
+the displayed ±1σ monthly band is the size we claim. Pooled over **4,068 non-overlapping
+ticker-months**, **68.8%** of realized moves landed inside it against 68.3% normal theory;
+17 of 18 tickers fall inside the pre-committed 63–73% range, and the result survives
+total-return prices, a 1-week horizon and λ = 0.97. The pre-committed rule said the UI
+sentence changes only if coverage lands outside 63–73%, so nothing shipped — **the first
+pre-committed check in this project to come back "no action needed."** It also corrected
+§5.1's reasoning: fat tails are real but live in the extremes (±2σ covers 94.0% vs 95.4%
+expected), invisible at the 1σ band actually displayed. This is confirmation of a shipped
+number, not a new edge — and it does not replace the live forward test, which still runs
+as pre-registered.
 
 Digests so far: [ma-timing.md](ma-timing.md), [momentum.md](momentum.md),
 [congressional-trading.md](congressional-trading.md), [rsi-macd.md](rsi-macd.md),

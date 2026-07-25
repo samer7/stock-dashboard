@@ -4,6 +4,21 @@ All notable changes to this project will be documented here.
 
 ---
 
+## [0.21.0] - 2026-07-25
+### Measured
+- **The displayed volatility band was checked for the first time — and it's honest.** `vol.js` had only ever measured whether EWMA *ranks* calm months ahead of wild ones (it does, 0.59 rank correlation). But the UI and the digest both assert "about 2 months in 3 land inside the band," which is a *calibration* claim about the number's SIZE — and that shipped untested. New harness experiment `server/harness/volband.js` (method and change-the-UI rule pre-committed in the file header before the first run) takes the band the UI would have printed on each past day and asks whether the next 21 trading days landed inside it
+- **Verdict: 68.8% of 4,068 non-overlapping ticker-months landed inside ±1σ, against 68.3% normal theory.** Per-ticker median 69.5%, and 17 of 18 tickers fall inside the pre-committed 63–73% acceptance range (AAPL the exception at 60.2%). Robust to every ablation: 68.4% on total-return prices, 70.3% at a 1-week horizon, 70.6% at λ=0.97
+- **Nothing shipped — the first pre-committed check in this project to come back "no action needed."** The rule said the UI sentence changes only if coverage landed outside 63–73%; it didn't, so the sentence stands exactly as written. This is confirmation of a shipped number, not a new edge: it says the band is honest, not that it is profitable
+
+### Fixed
+- **Corrected `volatility.md` §5.1's reasoning.** It named fat tails as the first suspect if coverage came in low, on the logic that fat tails make ±1σ under-cover. The data says that was aimed at the wrong place: at ±1σ the band is essentially perfect, and the deviation shows up only at ±2σ (94.0% vs 95.4% expected). Fat tails are real but live in the extremes, invisible at the 1σ band the UI displays — and for a symmetric fat-tailed distribution ±1σ tends to *over*-cover while ±2σ under-covers, which is exactly the measured signature. Written up as §6.3 with the falsifier itself annotated in place rather than rewritten
+
+### Notes
+- Coverage statistics use **non-overlapping** samples (every 21st day) as the headline. Consecutive days share 20 of their 21 outcome days, so overlapping windows are heavily autocorrelated and would have overstated precision by roughly 21×; the overlapping figure is printed alongside for contrast
+- The historical measurement does **not** replace the live forward test — a large historical sample is not an out-of-sample one, and the Phase 6 grading panel still runs its pre-registered band check as written. `volatility.md` §5.1 keeps the forward falsifier and gains a pointer to the new historical prior
+
+---
+
 ## [0.20.1] - 2026-07-25
 ### Fixed
 - **Both Phase 6 panels had an identically-labelled "Start with $10,000 (fake)" button.** v0.20.0 shortened the auto-follow button while rewriting that panel's copy and collided with the paper portfolio's. The owner hit exactly the predictable outcome — starting the automatic account while intending the manual one. They now read "Start the **manual** account" and "Start the **automatic** account"
